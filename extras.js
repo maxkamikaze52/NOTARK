@@ -167,12 +167,6 @@ dr.id = 'dashRow';
 dr.style.flexWrap = 'wrap';
 pn.insertBefore(dr, $('#sizes'));
 }
-let pr = $('#penRow');
-if (!pr) {
-pr = mk('div', 'penrow');
-pr.id = 'penRow';
-pn.insertBefore(pr, pn.firstChild);
-}
 const draw = DRAW_TOOLS.includes(tool);
 let sr = $('#smRow');
 if (!sr) {
@@ -190,7 +184,7 @@ sr.style.display = (draw && tool !== 'shape') ? 'flex' : 'none';
 const sv0 = Math.round(smoothR / .25);
 sr.querySelector('input').value = sv0;
 sr.querySelector('.size-val').textContent = sv0 + '%';
-dr.style.display = pr.style.display = draw ? 'flex' : 'none';
+dr.style.display = draw ? 'flex' : 'none';
 if (!draw) {
 positionPanel();
 return;
@@ -203,29 +197,6 @@ b.innerHTML = '<svg viewBox="0 0 40 8" style="width:40px;height:8px"><line x1="3
 b.onclick = () => { dashType = id; buildStylePanel(); };
 dr.appendChild(b);
 });
-pr.innerHTML = '';
-pens.forEach(pn2 => {
-const b = mk('button', 'pendot' + (pn2.base === tool && pn2.color.toLowerCase() === color.toLowerCase() ? ' on' : ''));
-b.style.background = pn2.color;
-b.title = pn2.base + ' · tap to use · hold to remove';
-let tm;
-b.onpointerdown = () => { tm = setTimeout(() => { tm = 'x'; if (confirm('Remove this pen?')) {
-pens = pens.filter(x => x !== pn2);
-savePens();
-buildStylePanel();
-} }, 600); };
-b.onpointerup = b.onpointerleave = () => { if (tm !== 'x')
-clearTimeout(tm); };
-b.onclick = () => { if (tm === 'x') {
-tm = null;
-return;
-} usePen(pn2); };
-pr.appendChild(b);
-});
-const add = mk('button', 'sw add', '+');
-add.title = 'Save current settings as a new pen';
-add.onclick = addPen;
-pr.appendChild(add);
 positionPanel();
 };
 function addPen() {

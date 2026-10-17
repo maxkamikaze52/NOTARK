@@ -281,6 +281,8 @@ return h(i) * (1 - u) + h(i + 1) * u;
 // wandering passes, then the whole thing is knocked back with a grain mask (speckle + paper
 // tooth) so it breaks up like a real pencil on paper instead of a clean vector line.
 const GRAIN = 128, grainCache = new Map();
+// Paper tooth: a hard-edged, high-contrast mask. Real graphite only touches the raised fibres,
+// so the mask must have real holes in it (alpha 0), not just a soft grey wash.
 function pencilGrain(seed) {
 const key = seed + '|' + paperColor();
 let g = grainCache.get(key);
@@ -290,12 +292,15 @@ cv.width = cv.height = GRAIN;
 const x = cv.getContext('2d'), img = x.createImageData(GRAIN, GRAIN), d = img.data;
 for (let i = 0; i < GRAIN * GRAIN; i++) {
 const px = i % GRAIN, py = (i / GRAIN) | 0;
-// fine speckle + a coarser "tooth" so the grain has structure, not just TV static
-const speck = vnoise(seed + 11, px * .9 + py * 1.7) * .5 + .5;
-const tooth = vnoise(seed + 29, px * .22 + py * .31) * .5 + .5;
-const v = Math.max(0, Math.min(255, 255 * (.35 + .65 * (speck * .55 + tooth * .45))));
-d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v;
-d[i * 4 + 3] = 255;
+// fine speckle (individual fibres) + coarse tooth (the paper's bumps), both pushed hard
+const speck = vnoise(seed + 11, px * 1.9 + py * 2.3) * .5 + .5;
+const tooth = vnoise(seed + 29, px * .17 + py * .23) * .5 + .5;
+const v = speck * .55 + tooth * .45;
+// threshold: below the cut the paper does not catch graphite at all
+const cut = .42;
+const a = v < cut ? 0 : Math.min(1, (v - cut) / (1 - cut) * 1.9);
+d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = 255;
+d[i * 4 + 3] = Math.round(255 * a);
 }
 x.putImageData(img, 0, 0);
 if (grainCache.size > 24) grainCache.clear();
@@ -318,7 +323,7 @@ const arc = new Array(n);
 arc[0] = 0;
 for (let i = 1; i < n; i++)
 arc[i] = arc[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
-const WAVE = 9, passes = [[1, .5, .05], [.62, .3, .22], [.62, .3, .22], [.4, .18, .34]];
+const WAVE = 7, passes = [[1, .62, .06], [.7, .34, .3], [.7, .34, .3], [.45, .2, .45], [.3, .12, .6]];
 const grain = pencilGrain(seed);
 const drawPasses = () => {
 for (let k = 0; k < passes.length; k++) {
@@ -347,7 +352,8 @@ c.save();
 c.globalCompositeOperation = 'destination-out';
 drawPasses();
 c.globalCompositeOperation = 'destination-in';
-if (pat.setTransform) pat.setTransform(new DOMMatrix([1, 0, 0, 1, (seed % 97) * 3, (seed % 53) * 5]));
+// the tooth must be visible at pen size: scale the mask up so fibres are ~1-2px on screen
+if (pat.setTransform) pat.setTransform(new DOMMatrix([1.6, 0, 0, 1.6, (seed % 97) * 3, (seed % 53) * 5]));
 c.globalAlpha = 1;
 c.fillStyle = pat;
 c.fillRect(-1e5, -1e5, 2e5, 2e5);
