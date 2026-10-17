@@ -6,7 +6,7 @@ const STORE = 'notark.notes.v1';
 const SIZES = [2,4,7,12];
 const PEN_TYPES = [
   { id:'pen',    label:'Pen',    alpha:1,   jitter:0,  widthMul:1,   smooth:2, flat:false },
-  { id:'pencil', label:'Pencil', alpha:.7,  jitter:1.1,widthMul:.9,  smooth:1, flat:false },
+  { id:'pencil', label:'Pencil', alpha:.85, jitter:1.1,widthMul:.9,  smooth:0, flat:false },
   { id:'marker', label:'Marker', alpha:.45, jitter:0,  widthMul:2.4, smooth:3, flat:true  },
 ];
 const SHAPES = [

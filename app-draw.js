@@ -277,13 +277,36 @@ const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f);
 const h = k => { let v = Math.imul((k ^ seed) | 0, 0x45d9f3b) >>> 0; v = Math.imul(v ^ (v >>> 15), 0x2c1b3c6d) >>> 0; v ^= v >>> 12; return ((v >>> 0) / 4294967296) * 2 - 1; };
 return h(i) * (1 - u) + h(i + 1) * u;
 }
-// Pencil = one clean core line + two thinner passes that wander gently (low-frequency noise
-// scaled to the pen width), so it looks like graphite but never zig-zags, even for tiny writing.
+// Pencil = graphite, not ink. The stroke is drawn as a soft core plus a few thin, slightly
+// wandering passes, then the whole thing is knocked back with a grain mask (speckle + paper
+// tooth) so it breaks up like a real pencil on paper instead of a clean vector line.
+const GRAIN = 128, grainCache = new Map();
+function pencilGrain(seed) {
+const key = seed + '|' + paperColor();
+let g = grainCache.get(key);
+if (g) return g;
+const cv = document.createElement('canvas');
+cv.width = cv.height = GRAIN;
+const x = cv.getContext('2d'), img = x.createImageData(GRAIN, GRAIN), d = img.data;
+for (let i = 0; i < GRAIN * GRAIN; i++) {
+const px = i % GRAIN, py = (i / GRAIN) | 0;
+// fine speckle + a coarser "tooth" so the grain has structure, not just TV static
+const speck = vnoise(seed + 11, px * .9 + py * 1.7) * .5 + .5;
+const tooth = vnoise(seed + 29, px * .22 + py * .31) * .5 + .5;
+const v = Math.max(0, Math.min(255, 255 * (.35 + .65 * (speck * .55 + tooth * .45))));
+d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v;
+d[i * 4 + 3] = 255;
+}
+x.putImageData(img, 0, 0);
+if (grainCache.size > 24) grainCache.clear();
+grainCache.set(key, cv);
+return cv;
+}
 function paintPencil(c, pts, st, def, baseW, alpha) {
 const n = pts.length, seed = (st.seed || 7) | 0;
 if (n < 3 && Math.hypot(pts[n - 1].x - pts[0].x, pts[n - 1].y - pts[0].y) < Math.max(baseW * .5, .5)) {
 c.fillStyle = c.strokeStyle;
-c.globalAlpha = alpha * .9;
+c.globalAlpha = alpha * .55;
 c.beginPath();
 c.arc((pts[0].x + pts[n - 1].x) / 2, (pts[0].y + pts[n - 1].y) / 2, baseW / 2, 0, 7);
 c.fill();
@@ -295,8 +318,10 @@ const arc = new Array(n);
 arc[0] = 0;
 for (let i = 1; i < n; i++)
 arc[i] = arc[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
-const WAVE = 9, passes = [[1, .9, .04], [.7, .35, .2], [.7, .35, .2]];
-for (let k = 0; k < 3; k++) {
+const WAVE = 9, passes = [[1, .5, .05], [.62, .3, .22], [.62, .3, .22], [.4, .18, .34]];
+const grain = pencilGrain(seed);
+const drawPasses = () => {
+for (let k = 0; k < passes.length; k++) {
 const [wm, am, jm] = passes[k], amp = def.jitter ? baseW * jm : 0;
 c.globalAlpha = alpha * am;
 c.lineWidth = baseW * wm;
@@ -313,6 +338,22 @@ c.quadraticCurveTo(q[i].x, q[i].y, (q[i].x + q[i + 1].x) / 2, (q[i].y + q[i + 1]
 c.lineTo(q[n - 1].x, q[n - 1].y);
 }
 c.stroke();
+}
+};
+// grain mask: draw the graphite, then keep only the parts the paper "catches"
+const pat = typeof c.createPattern === 'function' ? c.createPattern(grain, 'repeat') : null;
+if (pat) {
+c.save();
+c.globalCompositeOperation = 'destination-out';
+drawPasses();
+c.globalCompositeOperation = 'destination-in';
+if (pat.setTransform) pat.setTransform(new DOMMatrix([1, 0, 0, 1, (seed % 97) * 3, (seed % 53) * 5]));
+c.globalAlpha = 1;
+c.fillStyle = pat;
+c.fillRect(-1e5, -1e5, 2e5, 2e5);
+c.restore();
+} else {
+drawPasses();
 }
 c.globalAlpha = 1;
 c.setLineDash([]);
@@ -957,7 +998,10 @@ c.stroke();
 c.restore();
 }
 function stepLive(L, now) {
-const f = L.f, v = L.v, sc = canvas._scale || 1, tau = Math.pow(smoothR / 25, 1.5) * .35;
+const f = L.f, v = L.v, sc = canvas._scale || 1;
+// the pencil should feel like it is scratching the page: barely any lag, so the graphite
+// lands under the nib instead of trailing behind it
+const tau = Math.min(Math.pow(smoothR / 25, 1.5) * .35, L.st.penType === 'pencil' ? .012 : 1);
 const dt = Math.min(.1, Math.max(0, (now - L.t) / 1000));
 L.t = Math.max(L.t, now);
 if (tau < .01) {
