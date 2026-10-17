@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="color-scheme" content="light dark">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Notark">
+<meta name="theme-color" content="#f2f4f7">
+<title>Notark</title>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
+<link rel="apple-touch-icon" sizes="128x128" href="apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- shared gradients for the tool illustrations -->
+<svg width="0" height="0" style="position:absolute;width:0;height:0" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="gMetal"><stop offset="0" stop-color="#868d99"/><stop offset=".22" stop-color="#eef0f3"/><stop offset=".5" stop-color="#b4bac4"/><stop offset=".8" stop-color="#79808c"/><stop offset="1" stop-color="#4d535e"/></linearGradient>
+    <linearGradient id="gGold"><stop offset="0" stop-color="#946a1d"/><stop offset=".3" stop-color="#f4dc8e"/><stop offset=".55" stop-color="#cfa34b"/><stop offset="1" stop-color="#7f5a18"/></linearGradient>
+    <linearGradient id="gBlack"><stop offset="0" stop-color="#12151a"/><stop offset=".3" stop-color="#4c5460"/><stop offset=".55" stop-color="#272c34"/><stop offset="1" stop-color="#0c0e12"/></linearGradient>
+    <linearGradient id="gWood"><stop offset="0" stop-color="#c58742"/><stop offset=".35" stop-color="#f1c68b"/><stop offset=".7" stop-color="#dba665"/><stop offset="1" stop-color="#a66d2d"/></linearGradient>
+    <linearGradient id="gSlate"><stop offset="0" stop-color="#1b1f26"/><stop offset=".28" stop-color="#4b5462"/><stop offset=".5" stop-color="#2a303a"/><stop offset=".78" stop-color="#3c4451"/><stop offset="1" stop-color="#13161b"/></linearGradient>
+    <linearGradient id="gPink"><stop offset="0" stop-color="#c58a85"/><stop offset=".35" stop-color="#f5c6c1"/><stop offset=".7" stop-color="#e2a7a1"/><stop offset="1" stop-color="#b57570"/></linearGradient>
+    <linearGradient id="gPearl"><stop offset="0" stop-color="#a8afbb"/><stop offset=".3" stop-color="#fbfcfd"/><stop offset=".62" stop-color="#dde1e8"/><stop offset="1" stop-color="#959daa"/></linearGradient>
+    <linearGradient id="gTeal"><stop offset="0" stop-color="#103437"/><stop offset=".3" stop-color="#2d7075"/><stop offset=".62" stop-color="#1b4b4f"/><stop offset="1" stop-color="#0d2a2d"/></linearGradient>
+    <linearGradient id="gNavy"><stop offset="0" stop-color="#18213f"/><stop offset=".3" stop-color="#3a4c88"/><stop offset=".62" stop-color="#25326a"/><stop offset="1" stop-color="#121832"/></linearGradient>
+    <linearGradient id="gHl"><stop offset="0" stop-color="#d2b418"/><stop offset=".3" stop-color="#fff38e"/><stop offset=".65" stop-color="#f2da3e"/><stop offset="1" stop-color="#c7a80e"/></linearGradient>
+    <linearGradient id="gHlBody"><stop offset="0" stop-color="#cdac12"/><stop offset=".3" stop-color="#f9e86c"/><stop offset=".6" stop-color="#ecd02d"/><stop offset="1" stop-color="#b79a0b"/></linearGradient>
+    <linearGradient id="gFelt"><stop offset="0" stop-color="#13161b"/><stop offset=".5" stop-color="#3b414b"/><stop offset="1" stop-color="#0e1014"/></linearGradient>
+    <linearGradient id="gEW"><stop offset="0" stop-color="#bfc6d1"/><stop offset=".3" stop-color="#fff"/><stop offset=".65" stop-color="#eceff3"/><stop offset="1" stop-color="#b1b8c4"/></linearGradient>
+    <radialGradient id="gGlow"><stop offset="0" stop-color="#ff5a5a" stop-opacity=".95"/><stop offset=".4" stop-color="#ff2d2d" stop-opacity=".5"/><stop offset="1" stop-color="#ff2d2d" stop-opacity="0"/></radialGradient>
+  </defs>
+</svg>
+
+<!-- ============ LIBRARY ============ -->
+<div id="library" class="screen active">
+  <aside id="libSide" class="lib-side">
+    <div class="side-head">
+      <span class="side-brand">Notark</span>
+      <button class="icon-btn" id="sideClose" title="Close sidebar"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+    </div>
+    <nav class="side-nav">
+      <button class="side-item on" data-view="all"><svg viewBox="0 0 24 24"><path d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M15 4v5h5"/></svg>Your notes</button>
+      <div class="side-folders" id="sideFolders"></div>
+      <button class="side-item" data-view="recent"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Recent</button>
+      <button class="side-item" data-view="templates"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Templates</button>
+      <button class="side-item" id="sideNew"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New</button>
+      <div class="side-sub" id="sideNewMenu">
+        <button data-new="note">Blank note</button>
+        <button data-new="template">From a template</button>
+        <button data-new="folder">Folder</button>
+        <button data-new="open">Open a file</button>
+      </div>
+    </nav>
+  </aside>
+  <div class="side-scrim" id="sideScrim"></div>
+  <div class="lib-main">
+  <header class="lib-header">
+    <div class="lib-left">
+      <button class="icon-btn" id="sideToggle" title="Sidebar"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <div class="lib-title">Your notes</div>
+    </div>
+    <div class="lib-actions">
+      <button class="icon-btn" id="themeBtn" title="Toggle theme">
+        <svg viewBox="0 0 24 24"><path d="M20 14.300A8 8 0 0 1 9.700 4a8 8 0 1 0 10.300 10.300z"/></svg>
+      </button>
+      <button class="icon-btn" id="openBtn" title="Open file">
+        <svg viewBox="0 0 24 24"><path d="M3.500 7.500A1.500 1.500 0 0 1 5 6h4l2 2h8a1.500 1.500 0 0 1 1.500 1.500V17a1.500 1.500 0 0 1-1.500 1.500H5A1.500 1.500 0 0 1 3.500 17z"/></svg>
+      </button>
+      <button class="icon-btn" id="newFolderBtn" title="New folder">
+        <svg viewBox="0 0 24 24"><path d="M3.500 7.500A1.500 1.500 0 0 1 5 6h4l2 2h8a1.500 1.500 0 0 1 1.500 1.500V17a1.500 1.500 0 0 1-1.500 1.500H5A1.500 1.500 0 0 1 3.500 17z"/><path d="M12 10.800v4.400M9.800 13h4.400"/></svg>
+      </button>
+      <button class="icon-btn" id="exportAllBtn" title="Export all notes">
+        <svg viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 14v4.500A1.500 1.500 0 0 0 6.500 20h11a1.500 1.500 0 0 0 1.500-1.500V14"/></svg>
+      </button>
+      <button class="icon-btn" id="newNoteBtn" title="New note">
+        <svg viewBox="0 0 24 24" style="stroke-width:2"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
+  </header>
+  <div id="diskStatus" class="disk-status"></div>
+  <div id="folderRow" class="folder-row"></div>
+  <div class="lib-sub">
+    <div class="lib-sub-l"><span id="noteCount">0 notes</span><button class="chip" id="newFolderChip">+ New folder</button></div>
+    <div class="seg" id="sortSeg">
+      <button data-sort="date" class="on">Date</button>
+      <button data-sort="name">Name</button>
+    </div>
+  </div>
+  <div id="noteGrid" class="note-grid"></div>
+  <div id="emptyState" class="empty">
+    <div class="empty-icon">
+      <svg viewBox="0 0 24 24"><path d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M15 4v5h5"/></svg>
+    </div>
+    <p>No notes yet</p>
+    <span>Tap + to create, or open a .notark file</span>
+  </div>
+  </div>
+</div>
+
+<!-- ============ EDITOR ============ -->
+<div id="editor" class="screen">
+  <header class="ed-header">
+    <button class="icon-btn back" id="backBtn">
+        <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+    <input id="noteTitle" class="note-title" placeholder="Untitled" spellcheck="false">
+    <button class="icon-btn" id="paperBtn" title="Paper color">
+        <svg viewBox="0 0 24 24"><rect x="4.500" y="3.500" width="15" height="17" rx="2"/><path d="M8 8.500h8M8 12h8M8 15.500h4.500"/></svg>
+      </button>
+    <button class="icon-btn" id="paperColorBtn" title="White paper on/off">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none"/></svg>
+      </button>
+    <button class="icon-btn" id="saveBtn" title="Save to Files">
+        <svg viewBox="0 0 24 24"><path d="M5 4h11l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M8 4v5h7V4M7.500 20v-6h9v6"/></svg>
+      </button>
+    <button class="icon-btn" id="shareBtn" title="Export PNG">
+        <svg viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 14v4.500A1.500 1.500 0 0 0 6.500 20h11a1.500 1.500 0 0 0 1.500-1.500V14"/></svg>
+      </button>
+  </header>
+
+  <div class="canvas-wrap" id="canvasWrap">
+    <canvas id="rulerTop" class="ruler ruler-top"></canvas>
+    <canvas id="rulerLeft" class="ruler ruler-left"></canvas>
+    <canvas id="paper"></canvas>
+    <div id="textLayer" class="text-layer"></div>
+    <canvas id="laser" class="laser"></canvas>
+    <div id="ring" class="ring"></div>
+    <div id="selBar" class="selbar"><button id="selSave">Save to library</button><button id="selDel">Delete selection</button></div>
+  </div>
+
+  <!-- style popover: floats above the bottom toolbar -->
+  <div class="style-panel" id="stylePanel">
+    <div class="pen-types" id="shapeTypes" style="display:none"></div>
+    <div class="pen-types" id="eraserTypes" style="display:none"></div>
+    <div class="pen-types" id="selectTypes" style="display:none"></div>
+    <div class="fonts" id="fontTypes" style="display:none"></div>
+    <div class="pen-types" id="snapRow" style="display:none"><button class="sh" id="snapBtn">Snap to shapes: on</button></div>
+    <div class="opacity-row" id="laserRow" style="display:none">
+      <span>Fade</span>
+      <input type="range" id="laserRange" min="1" max="8" step="0.5" value="2.5">
+      <span class="size-val" id="laserVal">2.5 s</span>
+    </div>
+    <div class="size-row" id="sizes">
+      <div class="size-prev"><i id="sizeDot"></i></div>
+      <input type="range" id="sizeRange" min="1" max="30" step="1" value="4">
+      <span class="size-val" id="sizeVal">4 px</span>
+    </div>
+    <div class="opacity-row" id="hlOpacity" style="display:none">
+      <span>Opacity</span>
+      <input type="range" id="hlRange" min="10" max="100" value="35">
+    </div>
+    <div class="swatches" id="swatches"></div>
+    <div class="color-row" id="svWrap">
+      <div class="color-preview" id="colorPreview"></div>
+      <div class="picker" id="picker">
+        <canvas id="svCanvas" width="220" height="120"></canvas>
+        <div class="sv-cursor" id="svCursor"></div>
+        <input type="range" id="hueSlider" min="0" max="360" value="0" class="hue">
+      </div>
+    </div>
+  </div>
+
+  <!-- bottom toolbar: tools + page controls, Notability-style -->
+  <div class="bottom-bar" id="bottomBar">
+    <div class="bar-grip" id="barGrip" title="Drag to move the toolbar"><i></i></div>
+    <div class="toolbar" id="toolbar">
+      <button class="tool ins" data-tool="pen" title="Pen">
+        <svg class="ti" viewBox="0 0 28 52" aria-hidden="true">
+          <path d="M14 1.2c1.3 4 4.2 7.2 4.4 12.3H9.6c.2-5.1 2.9-8.3 4.4-12.3z" fill="url(#gGold)" stroke="#6b4c12" stroke-width=".4"/>
+          <path d="M14 5.2v8" fill="none" stroke="#6b4c12" stroke-width=".55"/>
+          <circle cx="14" cy="11.3" r=".9" fill="#5a3f0e"/>
+          <path d="M9.6 13.5h8.8l.9 10.5H8.7z" fill="url(#gBlack)"/>
+          <rect x="8.2" y="24" width="11.6" height="2.4" rx=".6" fill="url(#gMetal)"/>
+          <rect x="8" y="26.4" width="12" height="26" fill="url(#gBlack)"/>
+          <rect x="8" y="33" width="12" height="1.1" fill="url(#gGold)"/>
+          <rect x="10.2" y="27" width="1.3" height="25" fill="#fff" opacity=".17"/>
+        </svg>
+      </button>
+      <button class="tool ins" data-tool="pencil" title="Pencil">
+        <svg class="ti" viewBox="0 0 28 52" aria-hidden="true">
+          <path d="M14 1.4L19 15H9z" fill="url(#gWood)"/>
+          <path d="M14 1.4l1.7 4.6h-3.4z" fill="url(#gFelt)"/>
+          <path d="M9 15q1.25-1.8 2.5 0t2.5 0 2.5 0 2.5 0" fill="none" stroke="#8a5a22" stroke-width=".5"/>
+          <rect x="9" y="15" width="10" height="21" fill="url(#gSlate)"/>
+          <path d="M12.4 15v21M15.6 15v21" stroke="#fff" stroke-opacity=".1" stroke-width=".5"/>
+          <rect x="9" y="36" width="10" height="6.5" fill="url(#gGold)"/>
+          <path d="M9 38.2h10M9 40.4h10" stroke="#6b4c12" stroke-opacity=".55" stroke-width=".5"/>
+          <path d="M9 42.5h10v6.5a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 9 49z" fill="url(#gPink)"/>
+        </svg>
+      </button>
+      <button class="tool ins" data-tool="marker" title="Marker">
+        <svg class="ti" viewBox="0 0 28 52" aria-hidden="true">
+          <path d="M10.2 7l1.2-4.8 6.2-1L18 7z" fill="url(#gFelt)"/>
+          <path d="M9.4 7h9.2l.8 3.5H8.6z" fill="url(#gMetal)"/>
+          <rect x="8.4" y="10.5" width="11.2" height="41.5" rx="1.2" fill="url(#gPearl)"/>
+          <rect x="8.4" y="22" width="11.2" height="16" fill="url(#gTeal)"/>
+          <path d="M10.6 27h6.8M10.6 30h4.8M10.6 33h6" stroke="#fff" stroke-opacity=".55" stroke-width=".9" stroke-linecap="round"/>
+          <rect x="10" y="10.5" width="1.2" height="41.5" fill="#fff" opacity=".5"/>
+        </svg>
+      </button>
+      <button class="tool ins" data-tool="highlighter" title="Highlighter">
+        <svg class="ti" viewBox="0 0 28 52" aria-hidden="true">
+          <path d="M9.2 9l1-5.8 8.2-1.8.4 7.6z" fill="url(#gHl)" stroke="#9b8408" stroke-width=".35"/>
+          <path d="M7.4 19L9.2 9h9.6l1.8 10z" fill="url(#gHlBody)"/>
+          <rect x="7.2" y="19" width="13.6" height="2" fill="url(#gBlack)"/>
+          <rect x="7.2" y="21" width="13.6" height="31" fill="url(#gHlBody)"/>
+          <rect x="9.4" y="25" width="9.2" height="15" rx="1.6" fill="#fff" opacity=".28"/>
+          <path d="M10.8 29h6.4M10.8 32h4.4" stroke="#7a6a0a" stroke-opacity=".6" stroke-width=".8" stroke-linecap="round"/>
+          <rect x="9.6" y="21" width="1.1" height="31" fill="#fff" opacity=".35"/>
+        </svg>
+      </button>
+      <button class="tool ins" data-tool="eraser" title="Eraser">
+        <svg class="ti" viewBox="0 0 28 52" aria-hidden="true">
+          <path d="M6 14V6.4C6 4.1 7.6 2.2 9.8 2.2h8.4C20.4 2.2 22 4.1 22 6.4V14z" fill="url(#gEW)"/>
+          <rect x="6" y="14" width="16" height="38" fill="url(#gNavy)"/>
+          <path d="M6 14h16" stroke="#0b1226" stroke-opacity=".5" stroke-width=".6"/>
+          <rect x="6" y="19.5" width="16" height="1.1" fill="#fff" opacity=".7"/>
+          <rect x="6" y="22" width="16" height=".6" fill="#fff" opacity=".45"/>
+          <path d="M9.2 30h9.6M9.2 33h6.6" stroke="#fff" stroke-opacity=".5" stroke-width=".9" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <button class="tool util" data-tool="text" title="Text">
+        <svg viewBox="0 0 24 24"><path d="M5.5 6.5V5h13v1.5M12 5v14M9.5 19h5"/></svg>
+      </button>
+      <button class="tool util" data-tool="lasso" title="Select">
+        <svg viewBox="0 0 24 24"><ellipse cx="12" cy="9.5" rx="8" ry="5" stroke-dasharray="2.4 2.6"/><path d="M9 14.2c-.9 1.3-1 2.7-.2 3.7.8 1 2.100.9 2.600-.1"/></svg>
+      </button>
+      <button class="tool util" data-tool="shape" title="Shapes">
+        <svg viewBox="0 0 24 24"><rect x="3.5" y="10.5" width="9" height="9" rx="1.6"/><circle cx="16.5" cy="8" r="4.3"/><path d="M14.5 20l3.2-5.500L21 20z"/></svg>
+      </button>
+      <button class="tool util" id="imageBtn" title="Insert image">
+        <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.5"/><path d="M4 17l4.800-4.600 3.400 3.200 3-3 4.800 4.400"/></svg>
+      </button>
+      <button class="tool ins" data-tool="laser" title="Laser pointer">
+        <svg class="ti" viewBox="0 0 28 52" aria-hidden="true">
+          <circle cx="14" cy="6" r="5" fill="url(#gGlow)"/>
+          <circle cx="14" cy="6" r="1.7" fill="#ff4040"/>
+          <circle cx="14" cy="6" r=".7" fill="#fff" opacity=".9"/>
+          <rect x="10.4" y="7.4" width="7.2" height="4" rx="1.4" fill="url(#gBlack)"/>
+          <rect x="11" y="11" width="6" height="41" rx="1" fill="url(#gMetal)"/>
+          <path d="M11 15h6M11 16.8h6M11 18.6h6" stroke="#4d535e" stroke-opacity=".5" stroke-width=".5"/>
+          <rect x="12.4" y="26" width="3.2" height="6" rx="1.6" fill="#c2312f"/>
+          <rect x="12.7" y="26.4" width="1" height="5" rx=".5" fill="#fff" opacity=".35"/>
+          <rect x="11" y="40" width="6" height="2" fill="url(#gBlack)"/>
+        </svg>
+      </button>
+      <button class="tool util" id="libBtn" title="Saved drawings">
+        <svg viewBox="0 0 24 24"><path d="M7 3.500h10a1 1 0 0 1 1 1V20.500l-6-3.600-6 3.600V4.500a1 1 0 0 1 1-1z"/><path d="M12 7.600l1.100 2.200 2.400.35-1.750 1.700.4 2.400-2.150-1.150-2.150 1.150.4-2.400-1.750-1.700 2.400-.35z"/></svg>
+      </button>
+      <div class="tool-sep"></div>
+      <button class="tool util" id="undoBtn" title="Undo">
+        <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.500a5.500 5.500 0 0 1 0 11H11"/></svg>
+      </button>
+      <button class="tool util" id="redoBtn" title="Redo">
+        <svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.500a5.500 5.500 0 0 0 0 11H13"/></svg>
+      </button>
+    </div>
+    <div class="pagebar">
+      <button class="pg" id="prevPage">
+        <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <span id="pageLabel">1 / 1</span>
+      <button class="pg" id="nextPage">
+        <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+      <button class="pg add" id="addPage" title="Add page">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="snapHint" class="snap-hint"></div>
+
+<!-- drawing library -->
+<div id="libSheet" class="sheet">
+  <div class="sheet-card">
+    <div class="sheet-head">
+      <span>Saved drawings</span>
+      <button class="icon-btn" id="libClose" title="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div id="stampGrid" class="stamp-grid"></div>
+    <p id="stampEmpty" class="stamp-empty">Nothing saved yet. Use Select to circle a drawing, then tap “Save to library”.</p>
+  </div>
+</div>
+
+<!-- generic input dialog -->
+<div id="askSheet" class="sheet">
+  <div class="sheet-card ask-card">
+    <div class="sheet-head"><span id="askTitle">Name</span></div>
+    <input id="askInput" class="ask-input" type="text" autocomplete="off" spellcheck="false">
+    <div class="ask-actions">
+      <button class="ask-btn" id="askCancel">Cancel</button>
+      <button class="ask-btn primary" id="askOk">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- backup nag: one-tap export of everything -->
+<div id="backupNag" class="nag">
+  <div class="nag-card">
+    <div class="nag-text"><b>Back up your notes?</b><span>It's been a while since your last export. Notes live in this browser only.</span></div>
+    <div class="nag-actions">
+      <button class="ask-btn" id="nagLater">Later</button>
+      <button class="ask-btn primary" id="nagExport">Export all</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept=".notark,.json" style="display:none">
+<input type="file" id="imgInput" accept="image/*" multiple style="display:none">
+<script src="app-core.js"></script>
+<script src="app-draw.js"></script>
+<script src="app-tools.js?v=7"></script>
+<script src="extras.js"></script>
+<script src="sidebar.js"></script>
+<script src="files.js"></script>
+<script src="store.js?v=1"></script>
+</body>
+</html>
