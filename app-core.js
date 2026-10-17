@@ -353,6 +353,9 @@ function newPage(){
 /* ---------- editor ---------- */
 function openNote(id){
   cur = notes.find(n=>n.id===id); if(!cur) return;
+  // follow the note into its folder, so closing it lands where the note lives
+  // (and a new note made there stays in that folder) instead of the top level
+  if(libView === 'all' && (cur.folder || '') !== (folder || '')){ folder = cur.folder || null; renderFolders(); }
   page = 0;
   undoStack = []; redoStack = [];   // never carry undo history across notes
   selected = []; lassoPath = null; drawing = false;
