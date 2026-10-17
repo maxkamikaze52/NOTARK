@@ -505,6 +505,7 @@ async function importFiles(files){
       for(const n of (Array.isArray(o.notes) ? o.notes : [o.note || o])){
         if(!n || !Array.isArray(n.pages)){ bad++; continue; }
         count++; n.id = n.id || uid(); n.updated = n.updated || Date.now();
+        if(!n.title) n.title = (f.name || '').replace(/\.notark$/i, '');   // an untitled note keeps its file name
         for(const p of n.pages) for(const st of (p.strokes || [])) bakeStroke(st);
         const i = notes.findIndex(x => x.id === n.id);
         if(i < 0){ notes.push(n); added++; } else if(n.updated > (notes[i].updated || 0)){ notes[i] = n; updated++; } else { kept++; continue; }
@@ -512,7 +513,7 @@ async function importFiles(files){
       }
     }catch(e){ bad++; }
   }
-  thumbs.clear(); save(); renderFolders(); renderLibrary();
+  thumbs.clear(); flushNow(); save(); renderFolders(); renderLibrary();   // write now: a reload right after an import must not lose it
   if(files.length === 1 && count === 1 && last) openNote(last.id);
   else toast(added + ' added' + (updated ? ', ' + updated + ' updated' : '') + (kept ? ', ' + kept + ' already up to date' : '') + (bad ? ', ' + bad + ' could not be read' : ''));
 }
