@@ -11,7 +11,7 @@
 <title>Notark</title>
 <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
 <link rel="apple-touch-icon" sizes="128x128" href="apple-touch-icon.png">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
 
@@ -134,6 +134,7 @@
 
   <!-- style popover: floats above the bottom toolbar -->
   <div class="style-panel" id="stylePanel">
+    <div class="pen-types" id="penRow" style="display:none"></div>
     <div class="pen-types" id="shapeTypes" style="display:none"></div>
     <div class="pen-types" id="eraserTypes" style="display:none"></div>
     <div class="pen-types" id="selectTypes" style="display:none"></div>
@@ -161,6 +162,14 @@
         <div class="sv-cursor" id="svCursor"></div>
         <input type="range" id="hueSlider" min="0" max="360" value="0" class="hue">
       </div>
+      <div class="rgb-col" id="rgbCol">
+        <div class="rgb-sliders">
+          <div class="rgb-row"><span class="rgb-lab">R</span><i class="rgb-chip" id="rChip"></i><input type="number" id="rNum" min="0" max="255" step="1" value="0" inputmode="numeric" aria-label="Red"><input type="text" id="rHex" class="rgb-hex" maxlength="6" inputmode="text" spellcheck="false" aria-label="Hex colour"></div>
+          <div class="rgb-row"><span class="rgb-lab">G</span><i class="rgb-chip" id="gChip"></i><input type="number" id="gNum" min="0" max="255" step="1" value="0" inputmode="numeric" aria-label="Green"></div>
+          <div class="rgb-row"><span class="rgb-lab">B</span><i class="rgb-chip" id="bChip"></i><input type="number" id="bNum" min="0" max="255" step="1" value="0" inputmode="numeric" aria-label="Blue"></div>
+        </div>
+        <div class="fin-grid" id="finGrid"></div>
+      </div>
     </div>
   </div>
 
@@ -170,57 +179,64 @@
     <div class="toolbar" id="toolbar">
       <button class="tool ins" data-tool="pen" title="Pen">
         <svg class="ti" viewBox="0 0 28 52" aria-hidden="true">
-          <path d="M14 1.2c1.3 4 4.2 7.2 4.4 12.3H9.6c.2-5.1 2.9-8.3 4.4-12.3z" fill="url(#gGold)" stroke="#6b4c12" stroke-width=".4"/>
-          <path d="M14 5.2v8" fill="none" stroke="#6b4c12" stroke-width=".55"/>
-          <circle cx="14" cy="11.3" r=".9" fill="#5a3f0e"/>
-          <path d="M9.6 13.5h8.8l.9 10.5H8.7z" fill="url(#gBlack)"/>
-          <rect x="8.2" y="24" width="11.6" height="2.4" rx=".6" fill="url(#gMetal)"/>
-          <rect x="8" y="26.4" width="12" height="26" fill="url(#gBlack)"/>
-          <rect x="8" y="33" width="12" height="1.1" fill="url(#gGold)"/>
-          <rect x="10.2" y="27" width="1.3" height="25" fill="#fff" opacity=".17"/>
+          <g stroke="#1d2433" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round">
+            <path d="M14 1.6c1.4 4.2 4.3 7 4.5 12H9.5c.2-5 3.100-7.800 4.500-12z" fill="#f2c14e"/>
+            <path d="M14 6v7" fill="none" stroke-width=".9"/>
+            <path d="M9.500 13.600h9l1 9.600h-11z" fill="#4a5470"/>
+            <rect x="7.900" y="23.200" width="12.200" height="3.200" rx="1.200" fill="#eef0f5"/>
+            <rect x="7.900" y="26.400" width="12.200" height="25.600" rx="2" fill="#3a63e8"/>
+            <rect x="7.900" y="34" width="12.200" height="2.200" fill="#f2c14e"/>
+          </g>
+          <rect x="10.200" y="28" width="1.800" height="19" rx=".9" fill="#fff" opacity=".4"/>
         </svg>
       </button>
       <button class="tool ins" data-tool="pencil" title="Pencil">
         <svg class="ti" viewBox="0 0 28 52" aria-hidden="true">
-          <path d="M14 1.4L19 15H9z" fill="url(#gWood)"/>
-          <path d="M14 1.4l1.7 4.6h-3.4z" fill="url(#gFelt)"/>
-          <path d="M9 15q1.25-1.8 2.5 0t2.5 0 2.5 0 2.5 0" fill="none" stroke="#8a5a22" stroke-width=".5"/>
-          <rect x="9" y="15" width="10" height="21" fill="url(#gSlate)"/>
-          <path d="M12.4 15v21M15.6 15v21" stroke="#fff" stroke-opacity=".1" stroke-width=".5"/>
-          <rect x="9" y="36" width="10" height="6.5" fill="url(#gGold)"/>
-          <path d="M9 38.2h10M9 40.4h10" stroke="#6b4c12" stroke-opacity=".55" stroke-width=".5"/>
-          <path d="M9 42.5h10v6.5a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 9 49z" fill="url(#gPink)"/>
+          <g stroke="#1d2433" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round">
+            <path d="M14 2l5.600 14.200H8.400z" fill="#f1cf9e"/>
+            <path d="M14 2l2.100 5.400h-4.200z" fill="#2d3340"/>
+            <rect x="8.400" y="16.200" width="11.200" height="23" fill="#f0b429"/>
+            <path d="M14 16.200v23" fill="none" stroke-width=".9" opacity=".55"/>
+            <rect x="8.400" y="39.200" width="11.200" height="5.600" fill="#cdd3de"/>
+            <path d="M8.400 41.100h11.200M8.400 42.900h11.200" fill="none" stroke-width=".7"/>
+            <path d="M8.400 44.800h11.200v4.800a2 2 0 0 1-2 2H10.400a2 2 0 0 1-2-2z" fill="#f08a8a"/>
+          </g>
+          <rect x="10" y="17.500" width="1.600" height="20" rx=".8" fill="#fff" opacity=".4"/>
         </svg>
       </button>
       <button class="tool ins" data-tool="marker" title="Marker">
         <svg class="ti" viewBox="0 0 28 52" aria-hidden="true">
-          <path d="M10.2 7l1.2-4.8 6.2-1L18 7z" fill="url(#gFelt)"/>
-          <path d="M9.4 7h9.2l.8 3.5H8.6z" fill="url(#gMetal)"/>
-          <rect x="8.4" y="10.5" width="11.2" height="41.5" rx="1.2" fill="url(#gPearl)"/>
-          <rect x="8.4" y="22" width="11.2" height="16" fill="url(#gTeal)"/>
-          <path d="M10.6 27h6.8M10.6 30h4.8M10.6 33h6" stroke="#fff" stroke-opacity=".55" stroke-width=".9" stroke-linecap="round"/>
-          <rect x="10" y="10.5" width="1.2" height="41.5" fill="#fff" opacity=".5"/>
+          <g stroke="#1d2433" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round">
+            <path d="M10.400 7.200l1-4.400a1 1 0 0 1 1-.8h3.200a1 1 0 0 1 1 .8l1 4.400z" fill="#2d3340"/>
+            <rect x="9.200" y="7.200" width="9.600" height="4" rx="1" fill="#cfd5df"/>
+            <rect x="8.200" y="11.200" width="11.600" height="40.800" rx="2" fill="#f4f6fa"/>
+            <rect x="8.200" y="21" width="11.600" height="17" fill="#17a39b"/>
+          </g>
+          <path d="M10.800 26h6.400M10.800 29.500h4.400M10.800 33h5.600" stroke="#fff" stroke-width="1.100" stroke-linecap="round" fill="none" opacity=".85"/>
+          <rect x="17" y="12.500" width="1.400" height="38" rx=".7" fill="#1d2433" opacity=".09"/>
         </svg>
       </button>
       <button class="tool ins" data-tool="highlighter" title="Highlighter">
         <svg class="ti" viewBox="0 0 28 52" aria-hidden="true">
-          <path d="M9.2 9l1-5.8 8.2-1.8.4 7.6z" fill="url(#gHl)" stroke="#9b8408" stroke-width=".35"/>
-          <path d="M7.4 19L9.2 9h9.6l1.8 10z" fill="url(#gHlBody)"/>
-          <rect x="7.2" y="19" width="13.6" height="2" fill="url(#gBlack)"/>
-          <rect x="7.2" y="21" width="13.6" height="31" fill="url(#gHlBody)"/>
-          <rect x="9.4" y="25" width="9.2" height="15" rx="1.6" fill="#fff" opacity=".28"/>
-          <path d="M10.8 29h6.4M10.8 32h4.4" stroke="#7a6a0a" stroke-opacity=".6" stroke-width=".8" stroke-linecap="round"/>
-          <rect x="9.6" y="21" width="1.1" height="31" fill="#fff" opacity=".35"/>
+          <g stroke="#1d2433" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round">
+            <path d="M9.600 10.400l1-6 8-2.400.4 8.400z" fill="#ffe55c"/>
+            <rect x="8.900" y="10.400" width="10.200" height="3" rx="1" fill="#2d3340"/>
+            <rect x="7.400" y="13.400" width="13.200" height="38.600" rx="2" fill="#f6d936"/>
+            <rect x="7.400" y="24" width="13.200" height="14" fill="#fff6bf" stroke-width=".9"/>
+          </g>
+          <path d="M10 29h8M10 32.500h5" stroke="#1d2433" stroke-width="1" opacity=".55" stroke-linecap="round" fill="none"/>
+          <rect x="9.200" y="15" width="1.600" height="8" rx=".8" fill="#fff" opacity=".5"/>
         </svg>
       </button>
       <button class="tool ins" data-tool="eraser" title="Eraser">
         <svg class="ti" viewBox="0 0 28 52" aria-hidden="true">
-          <path d="M6 14V6.4C6 4.1 7.6 2.2 9.8 2.2h8.4C20.4 2.2 22 4.1 22 6.4V14z" fill="url(#gEW)"/>
-          <rect x="6" y="14" width="16" height="38" fill="url(#gNavy)"/>
-          <path d="M6 14h16" stroke="#0b1226" stroke-opacity=".5" stroke-width=".6"/>
-          <rect x="6" y="19.5" width="16" height="1.1" fill="#fff" opacity=".7"/>
-          <rect x="6" y="22" width="16" height=".6" fill="#fff" opacity=".45"/>
-          <path d="M9.2 30h9.6M9.2 33h6.6" stroke="#fff" stroke-opacity=".5" stroke-width=".9" stroke-linecap="round"/>
+          <g stroke="#1d2433" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round">
+            <path d="M6.600 14.400V7.200a4.800 4.800 0 0 1 4.800-4.800h5.200a4.800 4.800 0 0 1 4.800 4.800v7.200z" fill="#f6f7fa"/>
+            <rect x="6.600" y="14.400" width="14.800" height="37.600" rx="1.500" fill="#e8626b"/>
+          </g>
+          <rect x="6.600" y="19" width="14.800" height="1.600" fill="#fff" opacity=".7"/>
+          <path d="M9.400 30h9.200M9.400 33.500h6.400" stroke="#fff" stroke-width="1.100" opacity=".75" stroke-linecap="round" fill="none"/>
+          <rect x="8.400" y="5" width="1.600" height="6" rx=".8" fill="#1d2433" opacity=".1"/>
         </svg>
       </button>
       <button class="tool util" data-tool="text" title="Text">
@@ -237,15 +253,15 @@
       </button>
       <button class="tool ins" data-tool="laser" title="Laser pointer">
         <svg class="ti" viewBox="0 0 28 52" aria-hidden="true">
-          <circle cx="14" cy="6" r="5" fill="url(#gGlow)"/>
-          <circle cx="14" cy="6" r="1.7" fill="#ff4040"/>
-          <circle cx="14" cy="6" r=".7" fill="#fff" opacity=".9"/>
-          <rect x="10.4" y="7.4" width="7.2" height="4" rx="1.4" fill="url(#gBlack)"/>
-          <rect x="11" y="11" width="6" height="41" rx="1" fill="url(#gMetal)"/>
-          <path d="M11 15h6M11 16.8h6M11 18.6h6" stroke="#4d535e" stroke-opacity=".5" stroke-width=".5"/>
-          <rect x="12.4" y="26" width="3.2" height="6" rx="1.6" fill="#c2312f"/>
-          <rect x="12.7" y="26.4" width="1" height="5" rx=".5" fill="#fff" opacity=".35"/>
-          <rect x="11" y="40" width="6" height="2" fill="url(#gBlack)"/>
+          <circle cx="14" cy="6" r="5.400" fill="url(#gGlow)"/>
+          <g stroke="#1d2433" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round">
+            <rect x="10.400" y="7.600" width="7.200" height="4.200" rx="1.600" fill="#2d3340"/>
+            <rect x="10.400" y="11.800" width="7.200" height="40.200" rx="1.400" fill="#cfd5df"/>
+            <rect x="12.200" y="26" width="3.600" height="6.400" rx="1.800" fill="#e5484d"/>
+            <rect x="10.400" y="40" width="7.200" height="2.400" fill="#2d3340"/>
+          </g>
+          <circle cx="14" cy="6" r="1.800" fill="#ff4040" stroke="#1d2433" stroke-width=".8"/>
+          <rect x="11.900" y="13" width="1.300" height="24" rx=".65" fill="#fff" opacity=".55"/>
         </svg>
       </button>
       <button class="tool util" id="libBtn" title="Saved drawings">
@@ -315,8 +331,10 @@
 <input type="file" id="imgInput" accept="image/*" multiple style="display:none">
 <script src="app-core.js"></script>
 <script src="app-draw.js"></script>
-<script src="app-tools.js?v=7"></script>
+<script src="app-tools.js?v=34"></script>
 <script src="extras.js"></script>
+<script src="ui.js?v=3"></script>
+<script src="fx.js"></script>
 <script src="sidebar.js"></script>
 <script src="files.js"></script>
 <script src="store.js?v=1"></script>

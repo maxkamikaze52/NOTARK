@@ -167,6 +167,88 @@ dr.id = 'dashRow';
 dr.style.flexWrap = 'wrap';
 pn.insertBefore(dr, $('#sizes'));
 }
+let pr = $('#pencilRow');
+if (!pr) {
+pr = mk('div', 'pen-types');
+pr.id = 'pencilRow';
+pr.style.flexWrap = 'wrap';
+pn.insertBefore(pr, pn.firstChild);
+}
+pr.style.display = tool === 'pencil' ? 'flex' : 'none';
+if (tool === 'pencil') {
+pr.innerHTML = '';
+if (typeof paperTile === 'function') paperTile();
+const dpr = 2, PW = 64, PH = 22, ink = typeof inkFor === 'function' ? inkFor(color) : color;
+PENCIL_STYLES.forEach(ps => {
+const b = mk('button', 'sh' + (ps.id === pencilStyle ? ' on' : ''));
+b.title = ps.label;
+b.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 6px;min-width:76px';
+const cv = document.createElement('canvas');
+cv.width = PW * dpr;
+cv.height = PH * dpr;
+cv.style.cssText = 'width:' + PW + 'px;height:' + PH + 'px;border-radius:5px;display:block';
+const x = cv.getContext('2d');
+x.fillStyle = paperColor();
+x.fillRect(0, 0, cv.width, cv.height);
+x.scale(dpr, dpr);
+const pts = [];
+for (let i = 0; i <= 14; i++) pts.push({ x: 6 + i * (PW - 12) / 14, y: PH / 2 + Math.sin(i * .55) * 4 });
+try {
+paintStroke(x, { tool: 'pen', penType: 'pencil', pstyle: ps.id, color: ink, size: Math.min(TOOL_PX.pencil || 4, 7) / widthMul('pencil'), seed: 4242, baked: true, pts });
+} catch (err) { }
+const lb = document.createElement('span');
+lb.textContent = ps.label;
+lb.style.cssText = 'font-size:12px;line-height:1';
+b.append(cv, lb);
+b.onclick = () => {
+pencilStyle = ps.id;
+try { localStorage.setItem('notark.pencilStyle', ps.id); } catch (err) { }
+buildStylePanel();
+};
+pr.appendChild(b);
+});
+}
+let pnr = $('#penRow');
+if (!pnr) {
+pnr = mk('div', 'pen-types');
+pnr.id = 'penRow';
+pnr.style.flexWrap = 'wrap';
+pn.insertBefore(pnr, pn.firstChild);
+}
+pnr.style.display = tool === 'pen' ? 'flex' : 'none';
+if (tool === 'pen') {
+pnr.innerHTML = '';
+if (typeof paperTile === 'function') paperTile();
+const dpr = 2, PW = 64, PH = 22, ink = typeof inkFor === 'function' ? inkFor(color) : color;
+PEN_STYLES.forEach(ps => {
+const b = mk('button', 'sh' + (ps.id === penStyle ? ' on' : ''));
+b.title = ps.label;
+b.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 6px;min-width:76px';
+const cv = document.createElement('canvas');
+cv.width = PW * dpr;
+cv.height = PH * dpr;
+cv.style.cssText = 'width:' + PW + 'px;height:' + PH + 'px;border-radius:5px;display:block';
+const x = cv.getContext('2d');
+x.fillStyle = paperColor();
+x.fillRect(0, 0, cv.width, cv.height);
+x.scale(dpr, dpr);
+const pts = [];
+for (let i = 0; i <= 14; i++) pts.push({ x: 6 + i * (PW - 12) / 14, y: PH / 2 + Math.sin(i * .55) * 4 });
+try {
+paintStroke(x, { tool: 'pen', penType: 'pen', pstyle: ps.id, color: ink, size: Math.min(TOOL_PX.pen || 4, 7) / widthMul('pen'), seed: 4242, baked: true, pts });
+} catch (err) { }
+const lb = document.createElement('span');
+lb.textContent = ps.label;
+lb.style.cssText = 'font-size:12px;line-height:1';
+b.append(cv, lb);
+b.onclick = () => {
+penStyle = ps.id;
+try { localStorage.setItem('notark.penStyle', ps.id); } catch (err) { }
+buildStylePanel();
+};
+pnr.appendChild(b);
+});
+}
 const draw = DRAW_TOOLS.includes(tool);
 let sr = $('#smRow');
 if (!sr) {
@@ -540,6 +622,13 @@ resizeCanvas();
 renderPage();
 } });
 appearanceCard(b, openSettings);
+const hb = mk('div', 'scard');
+hb.appendChild(mk('h4', '', 'Hotbar'));
+const hbBtn = mk('button', 'opt');
+hbBtn.innerHTML = '<span>Reorder tools…</span>';
+hbBtn.onclick = openHotbarOrder;
+hb.appendChild(hbBtn);
+b.appendChild(hb);
 const g = opts(b, 'My pens', [], () => 0, () => { });
 pens.forEach(p => { const d = mk('button', 'opt'); d.innerHTML = '<span><b style="color:' + p.color + '">●</b> ' + p.base + ' ' + p.size + 'px · remove</span>'; d.onclick = () => { pens = pens.filter(x => x !== p); savePens(); openSettings(); }; g.appendChild(d); });
 const add = mk('button', 'opt');
@@ -548,6 +637,93 @@ add.onclick = () => { addPen(); openSettings(); };
 g.appendChild(add);
 });
 }
+/* ---- Hotbar order: drag (or ◀ ▶) to rearrange the tools in the bottom bar ---- */
+const HB_KEY = 'notark.hotbarOrder';
+const hbKey = el => el.dataset.tool || el.id || el.className;
+function hbItems() { const bar = $('#toolbar'); return bar ? [...bar.children].filter(el => el.classList.contains('tool')) : []; }
+/* after any reorder the bar's width changes, so the canvas padding/zoom must be recomputed */
+function hbRelayout() {
+  try {
+    if (typeof layoutBar === 'function') layoutBar();
+    if (cur) { resizeCanvas(); renderPage(); }
+  } catch (e) { console.warn('Notark: hotbar relayout failed', e); }
+}
+function hbLabel(el) {
+  const t = el.dataset.tool;
+  if (t) return t[0].toUpperCase() + t.slice(1);
+  return (el.title || el.id || 'Tool').replace(/^Insert /, '');
+}
+function saveHotbarOrder() {
+  const order = hbItems().map(hbKey);
+  localStorage.setItem(HB_KEY, JSON.stringify(order));
+}
+function applyHotbarOrder() {
+  let order;
+  try { order = JSON.parse(localStorage.getItem(HB_KEY) || 'null'); } catch (e) { order = null; }
+  if (!Array.isArray(order) || !order.length) return;
+  const bar = $('#toolbar');
+  if (!bar) return;
+  const items = hbItems();
+  if (!items.length) return;
+  const byKey = new Map(items.map(el => [hbKey(el), el]));
+  const seen = new Set();
+  try {
+    // separators stay put: only re-append the tool buttons, in the saved order
+    order.forEach(k => { const el = byKey.get(k); if (el && !seen.has(k)) { seen.add(k); bar.appendChild(el); } });
+    items.forEach(el => { if (!seen.has(hbKey(el))) bar.appendChild(el); });
+  } catch (e) { console.warn('Notark: could not apply hotbar order', e); }
+}
+function openHotbarOrder() {
+  openSheet('Reorder hotbar', b => {
+    const card = mk('div', 'scard');
+    card.appendChild(mk('h4', '', 'Drag to rearrange'));
+    const list = mk('div', 'hborder');
+    const draw = () => {
+      list.innerHTML = '';
+      hbItems().forEach((el, i, all) => {
+        const row = mk('div', 'hbrow');
+        row.draggable = true;
+        const grip = mk('span', 'hbgrip', '⠿');
+        const ic = mk('span', 'hbic');
+        const svg = el.querySelector('svg');
+        if (svg) ic.appendChild(svg.cloneNode(true));
+        const name = mk('span', 'hbname', hbLabel(el));
+        const up = mk('button', 'hbmv', '◀'), down = mk('button', 'hbmv', '▶');
+        up.disabled = i === 0; down.disabled = i === all.length - 1;
+        const move = d => { const t = all[i + d]; if (!t) return; d < 0 ? t.before(el) : t.after(el); saveHotbarOrder(); hbRelayout(); draw(); };
+        up.onclick = () => move(-1); down.onclick = () => move(1);
+        row.append(grip, ic, name, up, down);
+        row.ondragstart = e => { e.dataTransfer.setData('text/plain', String(i)); e.dataTransfer.effectAllowed = 'move'; row.classList.add('drag'); };
+        row.ondragend = () => row.classList.remove('drag');
+        row.ondragover = e => { e.preventDefault(); row.classList.add('over'); };
+        row.ondragleave = () => row.classList.remove('over');
+        row.ondrop = e => {
+          e.preventDefault(); row.classList.remove('over');
+          const from = +e.dataTransfer.getData('text/plain');
+          if (isNaN(from) || from === i) return;
+          const src = all[from];
+          from < i ? el.after(src) : el.before(src);
+          saveHotbarOrder(); hbRelayout(); draw();
+        };
+        list.appendChild(row);
+      });
+    };
+    draw();
+    card.appendChild(list);
+    const done = mk('button', 'opt');
+    done.style.marginTop = '10px';
+    done.innerHTML = '<span>Done</span>';
+    done.onclick = () => { toast('Hotbar order saved'); $('#xSheet').classList.remove('show'); };
+    card.appendChild(done);
+    const reset = mk('button', 'opt');
+    reset.style.marginTop = '8px';
+    reset.innerHTML = '<span>Reset to default order</span>';
+    reset.onclick = () => { localStorage.removeItem(HB_KEY); location.reload(); };
+    card.appendChild(reset);
+    b.appendChild(card);
+  });
+}
+try { applyHotbarOrder(); } catch (e) { console.warn('Notark: hotbar order not applied', e); }
 (function () {
 const rb = mk('button', 'icon-btn');
 rb.title = 'Pages panel';

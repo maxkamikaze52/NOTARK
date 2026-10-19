@@ -2,12 +2,52 @@
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 const STORE = 'notark.notes.v1';
+/* ---- notes live in a file next to the app, not in the browser ----
+   notes.json sits in the Notark folder (served by the local server). The app
+   reads it at start-up and writes it back on every save, so the strokes are
+   always in the project folder and survive clearing browser data. If the file
+   cannot be written (opened from file://, or no server), it falls back to
+   localStorage exactly as before. */
+const NOTES_FILE = 'notes.json';
+let notesFileOK = false, notesFileTimer = null, notesFileBusy = false, notesFileAgain = false;
+/* ---- the local server (notark_server.py) reads and writes notes.json for us ---- */
+const NOTES_API = '/api/notes';
+function notesApiLoad(){
+  try{
+    const x = new XMLHttpRequest();
+    x.open('GET', NOTES_API + '?t=' + Date.now(), false);   // sync: load() runs before the first render
+    x.send();
+    if(x.status !== 200) return false;
+    const o = JSON.parse(x.responseText);
+    if(!o || !Array.isArray(o.notes)) return false;
+    // notes.json is the source of truth. Only seed it from this browser when it is still empty.
+    if(o.notes.length === 0 && notes.length > 0){ notesFileOK = true; notesApiWrite(); return true; }
+    notes = o.notes;
+    if(Array.isArray(o.folders)) folders = o.folders;
+    notesFileOK = true;
+    return true;
+  }catch(e){ return false; }
+}
+function notesApiWrite(){
+  if(!notesFileOK) return;
+  if(notesFileBusy){ notesFileAgain = true; return; }
+  notesFileBusy = true;
+  const body = JSON.stringify({ app:'Notark', version:1, saved:Date.now(), folders, notes });
+  fetch(NOTES_API, { method:'PUT', headers:{'Content-Type':'application/json'}, body })
+    .then(r => { if(!r.ok) throw new Error(r.status); })
+    .catch(e => { console.warn('Notark: could not write notes.json', e); notesFileOK = false; setDiskStatus('Could not write notes.json — saving in this browser instead'); })
+    .finally(() => { notesFileBusy = false; if(notesFileAgain){ notesFileAgain = false; notesApiWrite(); } });
+}
+function notesFileSave(){
+  if(!notesFileOK) return;
+  clearTimeout(notesFileTimer); notesFileTimer = setTimeout(notesApiWrite, 600);
+}
 
 const SIZES = [2,4,7,12];
 const PEN_TYPES = [
   { id:'pen',    label:'Pen',    alpha:1,   jitter:0,  widthMul:1,   smooth:2, flat:false },
   { id:'pencil', label:'Pencil', alpha:.85, jitter:1.1,widthMul:.9,  smooth:0, flat:false },
-  { id:'marker', label:'Marker', alpha:.45, jitter:0,  widthMul:2.4, smooth:3, flat:true  },
+  { id:'marker', label:'Marker', alpha:.72, jitter:0,  widthMul:2.4, smooth:3, flat:true  },
 ];
 const SHAPES = [
   { id:'line',    label:'Line' },
@@ -23,10 +63,11 @@ let cur = null;
 let page = 0;
 let tool = 'pen';          // pen | highlighter | eraser | text | lasso | shape
 let eraserMode = 'stroke'; // 'stroke' = whole line, 'pixel' = partial erase
-let penType = 'pen';       // pen sub-type
 let shapeType = 'line';    // shape sub-type
 let highlighterOpacity = .35;
 let color = '#1c1c1e';
+let inkFinish = 'normal';   // finish of the ink: normal | glossy | metallic | dry | matte | neon
+try { const f = localStorage.getItem('notark.finish'); if (f) inkFinish = f; } catch (e) { }
 let size = SIZES[1];
 let drawing = false;
 let undoStack = [], redoStack = [];
@@ -59,6 +100,8 @@ function migrateLegacyKeys(){
 function load(){
   migrateLegacyKeys();
   try{ notes = JSON.parse(localStorage.getItem(STORE)) || []; }catch(e){ notes=[]; }
+  // notes.json in the app folder is the real store; localStorage is only the fallback
+  if(!notesApiLoad()) notesFileOK = false;
   // migrate: bake the smoothed geometry into every stored stroke once, so the
   // eraser always cuts exactly what is drawn (old strokes were re-smoothed on
   // every paint, so the visible line drifted away from its stored points).
@@ -122,11 +165,12 @@ function getImg(src){
 }
 let lsT;
 function lsWrite(){ try{ localStorage.setItem(STORE, JSON.stringify(notes)); localStorage.setItem('notark.folders', JSON.stringify(folders)); }catch(e){ if(!dirHandle) toast('Browser storage is full — choose a save folder'); } }
-const flushNow = ()=>{ clearTimeout(lsT); lsWrite(); };
+const flushNow = ()=>{ clearTimeout(lsT); lsWrite(); clearTimeout(notesFileTimer); notesApiWrite(); };
 addEventListener('pagehide', flushNow);
 addEventListener('visibilitychange', ()=>{ if(document.hidden) flushNow(); });
 function save(){
   clearTimeout(lsT); lsT = setTimeout(lsWrite, 1200);
+  notesFileSave();
   clearTimeout(diskTimer); diskTimer = setTimeout(flushDisk, 1200);
 }
 /* ---- device folder (File System Access API): notes autosave as .notark files, no server ---- */
@@ -136,7 +180,7 @@ const safeName = s => ((s||'Untitled').replace(/[\\/:*?"<>|]/g,'-').trim().slice
 const subdir = f => f ? dirHandle.getDirectoryHandle(safeName(f), {create:true}) : dirHandle;
 function setDiskStatus(msg){
   const el = $('#diskStatus'); if(!el) return;
-  el.textContent = msg || (dirHandle ? '● Autosaving to “'+dirHandle.name+'”' : pendingHandle ? 'Tap to reconnect your save folder' : canDisk ? 'Tap to choose a folder on this device for autosave' : 'Saved in this browser (use Chrome/Edge to save to a folder)');
+  el.textContent = msg || (dirHandle ? '● Autosaving to “'+dirHandle.name+'”' : notesFileOK ? '● Autosaving to notes.json in the Notark folder' : pendingHandle ? 'Tap to reconnect your save folder' : canDisk ? 'Tap to choose a folder on this device for autosave' : 'Saved in this browser (use Chrome/Edge to save to a folder)');
 }
 async function rmFile(path){ try{ const [a,b] = path.includes('/') ? path.split('/') : [null,path]; await (a ? await dirHandle.getDirectoryHandle(a) : dirHandle).removeEntry(b); }catch(e){} }
 async function flushDisk(){
@@ -266,7 +310,8 @@ function strokeCurve(st){
     const cv = st.dense ? st.pts : curvePts(st.pts, 2);
     let x0=1e9, y0=1e9, x1=-1e9, y1=-1e9;
     for(const q of cv){ if(q.x<x0) x0=q.x; if(q.x>x1) x1=q.x; if(q.y<y0) y0=q.y; if(q.y>y1) y1=q.y; }
-    e = {src:st.pts, cv, bb:[x0,y0,x1,y1]}; curveCache.set(st, e);
+    const cvw = st.dense ? ((st.wv && st.wv.length===st.pts.length) ? st.wv : null) : (typeof interpW==='function' ? interpW(st.pts, st.wv, cv) : null);
+    e = {src:st.pts, cv, cvw, bb:[x0,y0,x1,y1]}; curveCache.set(st, e);
   }
   return e;
 }
@@ -296,15 +341,15 @@ function eraseAt(a, b){
       if(!eraseMark.has(st) && e.cv.some(hit)){ eraseMark.add(st); changed = true; }
       next.push(st); continue;
     }
-    const frags = []; let run = [], cut = false;
-    for(const q of e.cv){
-      if(hit(q)){ cut = true; if(run.length>1) frags.push(run); run = []; }
-      else run.push(q);
-    }
+    const frags = []; let run = [], rw = [], cut = false;
+    e.cv.forEach((q, i) => {
+      if(hit(q)){ cut = true; if(run.length>1) frags.push([run, rw]); run = []; rw = []; }
+      else { run.push(q); rw.push(e.cvw ? e.cvw[i] : 1); }
+    });
     if(!cut){ next.push(st); continue; }
-    if(run.length>1) frags.push(run);
+    if(run.length>1) frags.push([run, rw]);
     changed = true;
-    for(const r of frags) next.push({...st, pts:r, baked:true, dense:true});
+    for(const [r, w] of frags) next.push({...st, pts:r, wv: e.cvw ? w : undefined, baked:true, dense:true});
   }
   if(changed){ p.strokes = next; scheduleRender(); }
 }
@@ -530,10 +575,10 @@ $('#sideNewMenu').onclick = e => {
   if(!wideScreen()) setSide(false, false);
   ({ note:newNote, template:() => showLib('templates', folder), folder:() => { showLib('all'); newFolder(); }, open:() => $('#fileInput').click() })[k.dataset.new]();
 };
-$('#sideAsk').checked = localStorage.getItem('notark.askSave') === '1';
-$('#sideAsk').onchange = e => localStorage.setItem('notark.askSave', e.target.checked ? '1' : '0');
-$('#sideSaveAll').onclick = saveAllToFiles;
-$('#sideImport').onclick = () => $('#fileInput').click();
+if ($('#sideAsk')) { $('#sideAsk').checked = localStorage.getItem('notark.askSave') === '1';
+$('#sideAsk').onchange = e => localStorage.setItem('notark.askSave', e.target.checked ? '1' : '0'); }
+if ($('#sideSaveAll')) $('#sideSaveAll').onclick = saveAllToFiles;
+if ($('#sideImport')) $('#sideImport').onclick = () => $('#fileInput').click();
 addEventListener('load', () => {
   $('#saveBtn').onclick = () => { if(cur) shareNotes([cur], cur.title || 'Note'); }; $('#saveBtn').title = 'Save to Files';
   $('#nagExport').onclick = saveAllToFiles;
