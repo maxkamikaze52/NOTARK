@@ -1,3 +1,8 @@
 .DS_Store
 _trash/
 *.bak
+
+*.bak-*
+*.wasm.bak
+__pycache__/
+.backup-*/

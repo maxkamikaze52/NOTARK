@@ -62,6 +62,20 @@ L.querySelectorAll('.tbox').forEach(el => {
 const t = p.texts.find(x => x.id === el.dataset.id);
 el.contentEditable = hand ? 'false' : 'true';
 el.style.touchAction = hand ? 'none' : '';
+if (t.font === 'mine' && window.NotarkFont) {
+const focused = el === document.activeElement;
+el.textContent = focused ? t.text : NotarkFont.cycle(t.text, (t.id || '').length);
+if (!el._handBind) {
+el._handBind = 1;
+/* the base listener stores what is on screen; this runs after it and restores real characters */
+el.addEventListener('input', () => { t.text = NotarkFont.unmap(el.textContent); });
+el.addEventListener('focus', () => { el.textContent = t.text; });
+}
+}
+if (t.w) { el.style.width = (t.w * canvas._scale) + 'px'; el.style.minWidth = '0'; }
+else { el.style.width = ''; el.style.minWidth = ''; }
+if (t.h) { el.style.height = (t.h * canvas._scale) + 'px'; el.style.overflow = 'hidden'; }
+else { el.style.height = ''; el.style.overflow = ''; }
 if (!hand)
 return;
 el.style.cursor = 'grab';
@@ -72,6 +86,8 @@ x.onpointerdown = e => e.stopPropagation();
 x.onclick = e => { e.stopPropagation(); delText(); };
 el.appendChild(x);
 }
+if (t === selText)
+addHandles(el, t);
 el.onpointerdown = e => {
 if (e.target.classList.contains('tdel'))
 return;
@@ -85,6 +101,64 @@ dragT.t0 = parseFloat(n.style.top);
 };
 });
 };
+const TMIN = 40;
+const HDIR = [['nw',-1,-1,'nwse-resize'],['n',0,-1,'ns-resize'],['ne',1,-1,'nesw-resize'],['e',1,0,'ew-resize'],['se',1,1,'nwse-resize'],['s',0,1,'ns-resize'],['sw',-1,1,'nesw-resize'],['w',-1,0,'ew-resize']];
+let rz = null;
+function addHandles(el, t) {
+for (const [d, hx, hy, cur] of HDIR) {
+const h = mk('i', 'th th-' + d);
+h.style.cursor = cur;
+h.onpointerdown = e => {
+e.stopPropagation();
+e.preventDefault();
+const r = el.getBoundingClientRect(), s = canvas._scale;
+const ox = parseFloat(el.style.left) - t.x * s, oy = parseFloat(el.style.top) - t.y * s;
+rz = { t, el, hx, hy, s, ox, oy, sx: e.clientX, sy: e.clientY, x0: t.x, y0: t.y,
+w0: t.w != null ? t.w : r.width / s, h0: t.h != null ? t.h : r.height / s, last: null };
+el.style.width = (rz.w0 * s) + 'px';
+el.style.height = (rz.h0 * s) + 'px';
+el.style.minWidth = '0';
+el.style.overflow = 'visible';
+};
+el.appendChild(h);
+}
+}
+function rzCalc(x0, y0, w0, h0, hx, hy, dx, dy, minH) {
+let x = x0, y = y0, w = w0, h = h0;
+if (hx < 0) { x = x0 + dx; w = w0 - dx; }
+else if (hx > 0) w = w0 + dx;
+if (hy < 0) { y = y0 + dy; h = h0 - dy; }
+else if (hy > 0) h = h0 + dy;
+if (w < TMIN) { if (hx < 0) x = x0 + w0 - TMIN; w = TMIN; }
+if (h < minH) { if (hy < 0) y = y0 + h0 - minH; h = minH; }
+return { x, y, w, h };
+}
+window.addEventListener('pointermove', e => {
+if (!rz)
+return;
+const s = rz.s;
+const n = rzCalc(rz.x0, rz.y0, rz.w0, rz.h0, rz.hx, rz.hy, (e.clientX - rz.sx) / s, (e.clientY - rz.sy) / s, Math.max(20, rz.t.size * 1.35));
+rz.last = n;
+rz.el.style.left = (rz.ox + n.x * s) + 'px';
+rz.el.style.top = (rz.oy + n.y * s) + 'px';
+rz.el.style.width = (n.w * s) + 'px';
+rz.el.style.height = (n.h * s) + 'px';
+});
+window.addEventListener('pointerup', () => {
+if (!rz)
+return;
+const r = rz;
+rz = null;
+if (r.last) {
+const n = r.last;
+r.t.x = Math.round(n.x * 10) / 10;
+r.t.y = Math.round(n.y * 10) / 10;
+r.t.w = Math.round(n.w);
+r.t.h = Math.round(n.h);
+touch();
+}
+renderTexts();
+});
 function delText() {
 if (!selText || !cur)
 return;
@@ -305,7 +379,23 @@ paintStroke(x, st);
 for (const t of p.texts) {
 x.fillStyle = inkFor(t.color);
 x.font = t.size + 'px ' + fontCss(t.font);
-t.text.split('\n').forEach((ln, i) => x.fillText(ln, t.x, t.y + t.size + i * t.size * 1.35));
+const lh = t.size * 1.35;
+const k = (x.canvas.width / p.w) || 1;
+const maxW = t.w ? Math.max(1, t.w - 8 / k) : 0;
+const lines = [];
+for (const para of t.text.split('\n')) {
+if (!maxW) { lines.push(para); continue; }
+let ln = '';
+for (const wd of para.split(/(\s+)/)) {
+const test = ln + wd;
+if (ln && x.measureText(test).width > maxW) { lines.push(ln.replace(/\s+$/, '')); ln = wd.replace(/^\s+/, ''); }
+else ln = test;
+}
+lines.push(ln);
+}
+if (t.h) { x.save(); x.beginPath(); x.rect(t.x, t.y, t.w || p.w, t.h); x.clip(); }
+lines.forEach((ln, i) => x.fillText(window.NotarkFont && t.font === 'mine' ? NotarkFont.cycle(ln, i) : ln, t.x, t.y + t.size + i * lh));
+if (t.h) x.restore();
 }
 }
 function pageCanvas(p, k) {
@@ -562,8 +652,7 @@ function applyRail() {
 $('#editor').classList.toggle('side', !!S.rail);
 rail.style.top = headerBottom() + 'px';
 drawRail();
-if (cur)
-layoutBar();
+updatePageLabel();
 }
 const _on0 = openNote;
 openNote = function (id) { _on0(id); applyRail(); };
@@ -644,7 +733,7 @@ function hbItems() { const bar = $('#toolbar'); return bar ? [...bar.children].f
 /* after any reorder the bar's width changes, so the canvas padding/zoom must be recomputed */
 function hbRelayout() {
   try {
-    if (typeof layoutBar === 'function') layoutBar();
+    /* top bar is fixed: no positioning pass needed */
     if (cur) { resizeCanvas(); renderPage(); }
   } catch (e) { console.warn('Notark: hotbar relayout failed', e); }
 }
@@ -1276,9 +1365,12 @@ r.append(inp, val);
 c.appendChild(r);
 b.appendChild(c);
 }
-function appearanceCard(b, again) { opts(b, 'Appearance', [['auto', 'Auto (follow iPad)'], ['light', 'Light'], ['dark', 'Dark']], () => themePref, v => setTheme(v), again); }
+// Notark is light-only (dark mode removed 2026-11-16); this card is kept so old
+// callers still work, but there is nothing to switch.
+function appearanceCard(b, again) { opts(b, 'Appearance', [['light', 'Light']], () => 'light', v => setTheme('light'), again); }
 function openAppearance() { openSheet('Appearance', b => appearanceCard(b, openAppearance)); }
-$('#themeBtn').onclick = openAppearance;
+const _themeBtnEl = $('#themeBtn');
+if (_themeBtnEl) _themeBtnEl.onclick = openAppearance;
 applyGap();
 const RULER_T = 20;
 var rulerKey = '';

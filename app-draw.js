@@ -154,10 +154,7 @@ c.setTransform(1, 0, 0, 1, 0, 0);
 c.drawImage(paperCache.cv, 0, 0);
 c.restore();
 }
-function paintScene(ctx, p, base) {
-paintPaper(ctx, p, base);
-for (const st of p.strokes)
-paintStroke(ctx, st);
+function paintOverlays(ctx, p) {
 if (selected.length && tool === 'lasso') {
 const b = selBox();
 ctx.save();
@@ -180,6 +177,45 @@ ctx.stroke();
 ctx.restore();
 }
 }
+function paintScene(ctx, p, base) {
+paintPaper(ctx, p, base);
+for (const st of p.strokes)
+paintStroke(ctx, st);
+paintOverlays(ctx, p);
+}
+// ---- big pages: first slice now, the rest over the next frames ----
+// A page with hundreds of strokes used to block the main thread until every textured pencil
+// stroke had been re-built: that is the "10 s to open" note. Now the page and its first
+// strokes appear at once and the rest stream in a slice per frame, so the app never freezes
+// and the pen stays live while the page fills in.
+const FIRST_SLICE = 80, SLICE_STROKES = 240, SLICE_MS = 9;
+let pageJob = 0;
+function cancelPageJob() {
+if (pageJob) {
+cancelAnimationFrame(pageJob);
+pageJob = 0;
+}
+}
+function runPageJob(p, from) {
+let i = from;
+const step = () => {
+pageJob = 0;
+if (!cur || cur.pages[page] !== p || canvas.width !== Math.round(p.w * Q)) return;
+const t0 = performance.now(), n = p.strokes.length;
+while (i < n && (i - from < SLICE_STROKES) && (i - from === 0 || performance.now() - t0 < SLICE_MS)) {
+paintStroke(ctx, p.strokes[i]);
+i++;
+}
+if (i < n) {
+pageJob = requestAnimationFrame(step);
+return;
+}
+paintOverlays(ctx, p);
+renderTexts();
+if (typeof window.notarkPagePainted === 'function') window.notarkPagePainted(n);
+};
+pageJob = requestAnimationFrame(step);
+}
 let rpRaf = 0, rpAfter = null, shownPage = null, shownPaper = '';
 function renderPage() {
 if (rpRaf) {
@@ -189,8 +225,16 @@ rpAfter = null;
 }
 if (!cur || !cur.pages || !cur.pages[page]) return;
 const p = cur.pages[page];
+cancelPageJob();
 ctx.setTransform(Q, 0, 0, Q, 0, 0);
-paintScene(ctx, p, true);
+paintPaper(ctx, p, true);
+const N = p.strokes.length, first = Math.min(N, FIRST_SLICE);
+for (let i = 0; i < first; i++)
+paintStroke(ctx, p.strokes[i]);
+if (N > first)
+runPageJob(p, first);
+else
+paintOverlays(ctx, p);
 shownPage = p;
 shownPaper = paperColor();
 canvas.style.background = shownPaper;
@@ -200,7 +244,13 @@ if (typeof sizeLaser === 'function')
 sizeLaser(p);
 if (typeof drawRuler === 'function')
 drawRuler();
-renderDetail();
+renderDetailSoon();
+}
+let detSoonT = 0;
+function renderDetailSoon() {
+if (detCv.style.display !== 'none') detCv.style.display = 'none';   // hide the stale sharp layer right away
+clearTimeout(detSoonT);
+detSoonT = setTimeout(() => { if (cur) renderDetail(); }, 150);
 }
 function renderSoon(after) {
 if (after)
@@ -286,6 +336,13 @@ return h(i) * (1 - u) + h(i + 1) * u;
 const scratch = { cv: null, g: null, cv2: null, g2: null };
 const SCRATCH_MAX = 4096;
 function withScratch(c, pts, pad, draw, blend, alpha) {
+// re-entrant: a style that itself asks for a scratch layer (pen styles inside a finish) draws straight into the
+// layer that is already open, instead of clearing it and compositing a shifted copy onto itself
+if (scratch.active && c === scratch.g) {
+const o = scratch.active;
+draw(c, o.k, o.x0, o.y0, o.W, o.H, o.layer);
+return;
+}
 let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
 for (const q of pts) {
 if (q.x < x0) x0 = q.x;
@@ -327,7 +384,13 @@ if (scratch.cv2.height < H) scratch.cv2.height = H;
 prep(scratch.g2);
 return scratch.g2;
 };
+scratch.active = { k, x0, y0, W, H, layer };
+try {
 draw(g, k, x0, y0, W, H, layer);
+}
+finally {
+scratch.active = null;
+}
 g.setTransform(1, 0, 0, 1, 0, 0);
 g.globalAlpha = 1;
 g.globalCompositeOperation = 'source-over';
@@ -463,6 +526,22 @@ try { const v = localStorage.getItem('notark.pencilStyle'); if (PENCIL_STYLES.so
 // pencil instead of ending in a clean vector edge. Fast movement thins it; the ends taper off.
 function paintPencil(c, pts, st, def, baseW, alpha) {
 const n = pts.length, seed = (st.seed || 7) | 0, col = c.strokeStyle, S = pencilStyleOf(st);
+// ---- LOD: when the page is drawn small on screen the paper tooth is sub-pixel, so the
+// five masked passes only cost time and change nothing you can see. One cheap stroke.
+const kLod = c.getTransform ? Math.abs(c.getTransform().a) : Q;
+if (kLod < .45 && n > 1) {
+c.save();
+c.globalAlpha = alpha * .85;
+c.lineWidth = Math.max(.5, baseW);
+c.lineCap = 'round';
+c.lineJoin = 'round';
+c.beginPath();
+c.moveTo(pts[0].x, pts[0].y);
+for (let i = 1; i < n; i++) c.lineTo(pts[i].x, pts[i].y);
+c.stroke();
+c.restore();
+return;
+}
 if (n < 3 && Math.hypot(pts[n - 1].x - pts[0].x, pts[n - 1].y - pts[0].y) < Math.max(baseW * .5, .5)) {
 c.fillStyle = col;
 c.globalAlpha = alpha * .55;
@@ -519,8 +598,63 @@ g.globalAlpha = 1;
 }, 'source-over', alpha);
 c.setLineDash([]);
 }
+// ---- Saber-style pencil: the grain lands while you draw, not on pen-up ----
+// A stamp = the paper tooth masked into a disc and tinted with the ink colour, built once
+// per colour+style and then blitted along the new piece of the stroke. One drawImage per
+// dab, no clip and no save/restore, so it keeps up with the pen. This is the Saber idea:
+// the brush is a texture stamped along the path, not a stroked path.
+const stampCache = new Map();
+function pencilStamp(col, cut, px) {
+const key = col + '|' + cut + '|' + px;
+let cv = stampCache.get(key);
+if (cv) return cv;
+cv = document.createElement('canvas');
+cv.width = cv.height = px;
+const x = cv.getContext('2d');
+x.fillStyle = col;
+x.beginPath();
+x.arc(px / 2, px / 2, px / 2 - .5, 0, 7);
+x.fill();
+const g = pencilGrain(cut);
+x.globalCompositeOperation = 'destination-in';
+x.imageSmoothingEnabled = true;
+x.drawImage(g, 0, 0, GRAIN, GRAIN, 0, 0, px, px);
+if (stampCache.size > 40) stampCache.clear();
+stampCache.set(key, cv);
+return cv;
+}
+function stampPencil(L, from) {
+const st = L.st, c = lvx, pts = st.pts, n = pts.length;
+if (n < 2) return;
+const def = PEN_TYPES.find(t => t.id === 'pencil') || PEN_TYPES[2];
+const S = pencilStyleOf(st), bw = Math.max(.8, st.size * def.widthMul * S.w);
+const seed = (st.seed || 7) | 0, wvv = (st.wv && st.wv.length === n) ? st.wv : null;
+const step = Math.max(.6, bw * .28);
+const m = liveD, k = m ? m.k : Q, tx = m ? m.tx : 0, ty = m ? m.ty : 0;
+const px = Math.max(8, Math.min(96, Math.round(bw * k * 2)));
+const stamp = pencilStamp(inkFor(st.color), .14, px);
+c.setTransform(1, 0, 0, 1, 0, 0);
+c.globalCompositeOperation = 'source-over';
+c.globalAlpha = Math.min(1, .9 * (def.alpha || .85) * S.a);
+let prev = null, walk = 0;
+for (let i = Math.max(0, from - 1); i < n; i++) {
+const p = pts[i];
+if (!prev) { prev = p; continue; }
+const dx = p.x - prev.x, dy = p.y - prev.y, d = Math.hypot(dx, dy);
+if (d > 0) for (let t = 0; t < d; t += step) {
+const u = t / d, x = prev.x + dx * u, y = prev.y + dy * u;
+const wp = wvv ? wvv[i] : 1;
+// pressure shapes the disc, the hash gives the individual "tooth" speckle of each dab
+const r = bw * Math.max(.3, wp) * (.82 + .36 * h2((walk * 7) | 0, (walk * 13) | 0, seed)) * .5;
+const dr = Math.max(.8, r * k), cx = x * k + tx, cy = y * k + ty;
+c.drawImage(stamp, cx - dr, cy - dr, dr * 2, dr * 2);
+walk++;
+}
+prev = p;
+}
+c.globalAlpha = 1;
+}
 // ---- finishes: how the ink sits on the paper. 'normal' is the plain stroke; the others paint the
-// stroke into a scratch layer and then shade it (glossy highlight, metallic sheen, dry grain, ...).
 const FINISHES = ['normal', 'glossy', 'metallic', 'dry', 'matte', 'neon'];
 function finishOf(st) { return FINISHES.includes(st.finish) ? st.finish : 'normal'; }
 function shadeFinish(g, fin, x0, y0, W, H, k, seed) {
@@ -705,7 +839,7 @@ c.fill();
 c.restore();
 c.setLineDash([]);
 }
-function paintStroke(c, st) {
+function paintStrokeRaw(c, st) {
 if (st.tool === 'image') {
 const im = getImg(st.src), a = st.pts[0], b = st.pts[1];
 if (im.complete && im.naturalWidth) {
@@ -722,6 +856,8 @@ return;
 const type = st.penType || 'pen';
 const def = PEN_TYPES.find(t => t.id === type) || PEN_TYPES[0];
 const isHL = st.tool === 'highlighter';
+const kDev = c.getTransform ? Math.abs(c.getTransform().a) : Q;   // device pixels per page unit
+const pdev = kDev;
 const alpha0 = isHL ? (st.opacity != null ? st.opacity : .35) : def.alpha;
 const alpha = eraseMark.has(st) ? Math.max(.12, alpha0 * .25) : alpha0;
 const baseW = st.size * (isHL ? 3 : def.widthMul);
@@ -730,7 +866,7 @@ c.lineCap = (isHL || def.flat) ? 'butt' : 'round';
 c.lineJoin = 'round';
 applyDash(c, st, baseW);
 c.globalAlpha = alpha;
-if (finishOf(st) !== 'normal' && st.tool !== 'shape' && type !== 'pencil' && !(type === 'marker' && !isHL) && !(type === 'pen' && !isHL)) {
+if (finishOf(st) !== 'normal' && kDev >= .45 && st.tool !== 'shape' && type !== 'pencil' && !(type === 'marker' && !isHL) && !(type === 'pen' && !isHL)) {
 paintFinished(c, st, baseW, alpha, (g, a) => {
 g.strokeStyle = c.strokeStyle;
 g.lineCap = c.lineCap;
@@ -751,7 +887,23 @@ c.globalAlpha = 1;
 return;
 }
 const pts = raw;
+if (TEXTURED_ON && typeof paintTextured === 'function' && pdev >= .45 && (type === 'pencil' || type === 'pen') && finishOf(st) === 'normal' && (!st.dash || st.dash === 'solid')) {
+// Rnote-style textured dots (ink-modes.js). Geometry, not a bitmap mask, so it
+// stays sharp at every zoom level. Opt-in: localStorage.notark.textured = 1
+paintTextured(c, pts, st, baseW, alpha, pdev);
+c.setLineDash([]);
+return;
+}
 if (type === 'pencil') {
+// Saber pencil: perfect-freehand outline + FBM grain (pencil-saber.js). Only for the
+// sharp render path; cached/baked strokes already went through the bitmap cache above.
+if (typeof saberPaint === 'function' && typeof SABER_PENCIL !== 'undefined' && SABER_PENCIL && pdev >= .45) {
+// BUG FIX (2026-11-16): this used `m`, which only exists inside paintStroke(); in this
+// scope it was a ReferenceError on every sharp pencil repaint. Read the transform here.
+const tm = c.getTransform ? c.getTransform() : { a: Q, e: 0, f: 0 };
+saberPaint(c, st, saberPts(st), baseW, Math.abs(tm.a) || Q, tm.e, tm.f);
+return;
+}
 paintPencil(c, pts, st, def, baseW, alpha);
 return;
 }
@@ -804,6 +956,156 @@ c.lineTo(pts[0].x + .1, pts[0].y + .1);
 c.stroke();
 c.globalAlpha = 1;
 c.setLineDash([]);
+}
+// ---- stroke bitmap cache: textured strokes are rendered once and then blitted ----
+const BMP_MAX_ONE = 4e6;      // do not cache a stroke whose bitmap is bigger than this many pixels
+const BMP_BUDGET = 24e6;      // total cached pixels (about 96 MB). Lower this if the iPad runs out of memory
+const strokeBmp = new Map();  // stroke -> {cv, src, key, bx0, by0, px}   (Map order = LRU order)
+let strokeBmpPx = 0;
+const bbCache = new WeakMap();
+function strokeBBox(st) {
+let e = bbCache.get(st);
+if (e && e.src === st.pts && e.n === st.pts.length) return e;
+let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+for (const q of st.pts) {
+if (q.x < x0) x0 = q.x;
+if (q.x > x1) x1 = q.x;
+if (q.y < y0) y0 = q.y;
+if (q.y > y1) y1 = q.y;
+}
+e = { src: st.pts, n: st.pts.length, x0, y0, x1, y1 };
+bbCache.set(st, e);
+return e;
+}
+function dropBmp(st) {
+const e = strokeBmp.get(st);
+if (!e) return;
+strokeBmp.delete(st);
+strokeBmpPx -= e.px;
+e.cv.width = e.cv.height = 0;
+}
+function clearStrokeCache() { for (const st of [...strokeBmp.keys()]) dropBmp(st); strokeBmpPx = 0; }
+function bmpCacheable(st) {
+if (!st.baked || st.tool === 'shape' || st.tool === 'image' || st.tool === 'highlighter') return false;
+if (st.pts.length < 3 || eraseMark.has(st)) return false;
+if ((st.penType || 'pen') === 'marker') return false;          // marker uses multiply blending with the page
+if (moving && selected.includes(st)) return false;              // being dragged: geometry changes every frame
+return true;
+}
+// ---- point simplification (Ramer-Douglas-Peucker) ----
+// Runs once per stroke, on pen-up. Removes the sample points that sit on a line the eye
+// cannot tell apart, which in normal handwriting is 70-90% of them, so a page full of ink
+// still repaints, saves and reloads fast. Iterative (no recursion) so a huge scribble
+// cannot blow the stack.
+function rdpKeep(pts, eps2) {
+const n = pts.length, keep = new Uint8Array(n);
+keep[0] = 1;
+keep[n - 1] = 1;
+const stack = [0, n - 1];
+while (stack.length) {
+const i1 = stack.pop(), i0 = stack.pop();
+if (i1 - i0 < 2)
+continue;
+const a = pts[i0], b = pts[i1], dx = b.x - a.x, dy = b.y - a.y, L = dx * dx + dy * dy;
+let mi = -1, md = eps2;
+for (let i = i0 + 1; i < i1; i++) {
+const q = pts[i];
+let d;
+if (L < 1e-9) {
+const ex = q.x - a.x, ey = q.y - a.y;
+d = ex * ex + ey * ey;
+}
+else {
+let t = ((q.x - a.x) * dx + (q.y - a.y) * dy) / L;
+t = t < 0 ? 0 : t > 1 ? 1 : t;
+const ex = q.x - (a.x + dx * t), ey = q.y - (a.y + dy * t);
+d = ex * ex + ey * ey;
+}
+if (d > md) {
+md = d;
+mi = i;
+}
+}
+if (mi > 0) {
+keep[mi] = 1;
+stack.push(i0, mi, mi, i1);
+}
+}
+return keep;
+}
+function simplifyStroke(st) {
+if (!st || !st.pts || st.pts.length < 32 || st.tool === 'shape' || st.tool === 'image')
+return 0;
+if (st.dash && st.dash !== 'solid')
+return 0;
+const pts = st.pts;
+const eps = Math.max(.28, (st.size || 4) * .1);    // page units: well under one pixel at 100%
+const keep = rdpKeep(pts, eps * eps);
+let n = 0;
+for (let i = 0; i < keep.length; i++)
+if (keep[i])
+n++;
+if (!n || n > pts.length - 8)
+return 0;                                        // nothing worth the churn
+const np = new Array(n), nw = (st.wv && st.wv.length === pts.length) ? new Array(n) : null;
+let j = 0;
+for (let i = 0; i < pts.length; i++) if (keep[i]) {
+np[j] = pts[i];
+if (nw)
+nw[j] = st.wv[i];
+j++;
+}
+const cut = pts.length - n;
+st.pts = np;
+if (nw)
+st.wv = nw;
+return cut;
+}
+function paintStroke(c, st) {
+// only the real page canvases use the cache; thumbnails, live canvas and the handwriting sheet draw directly
+if (c !== ctx && c !== dctx) return paintStrokeRaw(c, st);
+const pts = st.pts;
+if (!pts || !pts.length) return paintStrokeRaw(c, st);
+const m = c.getTransform(), k = m.a;
+if (!(Math.abs(m.b) < 1e-9 && Math.abs(m.c) < 1e-9 && Math.abs(m.a - m.d) < 1e-9 && k > 0)) return paintStrokeRaw(c, st);
+const bb = strokeBBox(st), pad = (st.size || 4) * 10 + 20;
+// skip strokes that are completely outside the canvas (matters a lot when zoomed in)
+if ((bb.x1 + pad) * k + m.e < 0 || (bb.x0 - pad) * k + m.e > c.canvas.width || (bb.y1 + pad) * k + m.f < 0 || (bb.y0 - pad) * k + m.f > c.canvas.height)
+return;
+if (!bmpCacheable(st)) return paintStrokeRaw(c, st);
+const bx0 = Math.floor((bb.x0 - pad) * k), by0 = Math.floor((bb.y0 - pad) * k);
+const bw = Math.ceil((bb.x1 + pad) * k) - bx0, bh = Math.ceil((bb.y1 + pad) * k) - by0;
+if (bw < 1 || bh < 1 || bw * bh > BMP_MAX_ONE) return paintStrokeRaw(c, st);
+const key = k.toFixed(3) + '|' + pts.length + '|' + inkFor(st.color) + '|' + (paperPx ? 1 : 0) + '|' + finishOf(st) + '|' + st.size + '|' + (st.pstyle || '') + '|' + (st.penType || 'pen');
+let e = strokeBmp.get(st);
+if (e && (e.src !== pts || e.key !== key)) { dropBmp(st); e = null; }
+if (!e) {
+const cv = document.createElement('canvas');
+cv.width = bw;
+cv.height = bh;
+const g = cv.getContext('2d');
+g.setTransform(k, 0, 0, k, -bx0, -by0);
+paintStrokeRaw(g, st);
+e = { cv, src: pts, key, bx0, by0, px: bw * bh };
+strokeBmp.set(st, e);
+strokeBmpPx += e.px;
+while (strokeBmpPx > BMP_BUDGET && strokeBmp.size > 1) {
+const first = strokeBmp.keys().next().value;
+if (first === st) break;
+dropBmp(first);
+}
+}
+else {
+strokeBmp.delete(st);   // mark as most recently used
+strokeBmp.set(st, e);
+}
+c.save();
+c.setTransform(1, 0, 0, 1, 0, 0);
+c.globalAlpha = 1;
+c.globalCompositeOperation = 'source-over';
+c.setLineDash([]);
+c.drawImage(e.cv, Math.round(e.bx0 + m.e), Math.round(e.by0 + m.f));
+c.restore();
 }
 function drawShape(c, st, w) {
 const a = st.pts[0], b = st.pts[st.pts.length - 1];
@@ -1121,12 +1423,37 @@ if (zfix || !zlock || pinch || pan || glide || performance.now() > zlock.until)
 return;
 settleAnchor(zlock.a, zlock.nx, zlock.ny, false);
 }, { passive: true });
+
+// After a pinch commits, the page is re-laid out at the new zoom. If the browser
+// clamped the scroll while the page grew, the page visibly jumps ("snaps into
+// place"). This puts the pinch centre back exactly under the fingers, then paints.
+function settlePinch(p) {
+const wrap = wrapEl();
+const el = canvas;
+for (let pass = 0; pass < 3; pass++) {
+const r = el.getBoundingClientRect(), c = canScroll();
+const dx = (r.left + p.anchor.fx * r.width) - p.nx;
+const dy = (r.top + p.anchor.fy * r.height) - p.ny;
+if (Math.abs(dx) < .6 && Math.abs(dy) < .6)
+break;
+if (c.x)
+wrap.scrollLeft += dx;
+if (c.y)
+wrap.scrollTop += dy;
+if (!c.x)
+panOff.x -= dx;
+if (!c.y)
+panOff.y -= dy;
+applyPanOffset();
+}
+if (typeof renderDetailSoon === 'function')
+renderDetailSoon();
+}
 function commitZoom(z, anchor, nx, ny) {
 if (!cur)
 return;
 S.zoom = z;
 saveS();
-resetPanOffset();
 zcommit = true;
 try { resizeCanvas(); } finally { zcommit = false; }
 reanchor(anchor, nx, ny, true);
@@ -1202,6 +1529,7 @@ if (el)
 el.style.visibility = '';
 if (p.z !== p.z0 || Math.hypot(p.nx - p.mx, p.ny - p.my) > 1) {
 commitZoom(p.z, p.anchor, p.nx, p.ny);
+settlePinch(p);
 }
 else
 renderDetail();
@@ -1221,6 +1549,7 @@ liveCv.style.display = 'none';
 $('#canvasWrap').insertBefore(liveCv, $('#laser'));
 const lvx = liveCv.getContext('2d');
 let live = null, activeId = null, liveRaf = 0, liveD = null;
+window.notarkIsDrawing = () => !!(live || drawing || moving || resizing);
 const detCv = document.createElement('canvas'), dctx = detCv.getContext('2d');
 detCv.className = 'laser';
 detCv.style.cssText = 'position:fixed;display:none;z-index:2';
@@ -1281,11 +1610,15 @@ const wr = byId('canvasWrap'), r = canvas.getBoundingClientRect(), wrr = wr.getB
 Object.assign(liveCv.style, { display: 'block', position: 'absolute', width: r.width + 'px', height: r.height + 'px',
 left: (r.left - wrr.left + wr.scrollLeft) + 'px', top: (r.top - wrr.top + wr.scrollTop) + 'px' });
 }
+const LIVE_SIMPLE = true;   // true = every pen/pencil/marker is previewed as a plain smooth line while you draw; the textured look is applied when you lift the pen. Set to false to restore the old behaviour (slow on long strokes).
 function incOK(st) {
-if (st.tool !== 'pen' || (st.penType || 'pen') !== 'pen')
-return false;
+if (st.tool !== 'pen') return false;
+if (st.dash && st.dash !== 'solid') return false;
+if (eraseMark.has(st)) return false;
+if (LIVE_SIMPLE) return true;
+if ((st.penType || 'pen') !== 'pen') return false;
 const def = PEN_TYPES.find(t => t.id === 'pen') || PEN_TYPES[0];
-return def.alpha >= .999 && !def.flat && (!st.dash || st.dash === 'solid') && !eraseMark.has(st);
+return def.alpha >= .999 && !def.flat;
 }
 function liveInc(L) {
 const st = L.st;
@@ -1300,27 +1633,34 @@ return false;
 const pts = st.pts, n = pts.length;
 if (n < 3)
 return false;
+if (liveD)
+lvx.setTransform(liveD.k, 0, 0, liveD.k, liveD.tx, liveD.ty);
+else
+lvx.setTransform(Q, 0, 0, Q, 0, 0);
+const def = PEN_TYPES.find(t => t.id === (st.penType || 'pen')) || PEN_TYPES[0];
+const bw = st.size * def.widthMul, wv = (st.wv && st.wv.length === n) ? st.wv : null;
+lvx.strokeStyle = inkFor(st.color);
+lvx.lineCap = lvx.lineJoin = 'round';
+lvx.globalAlpha = 1;
+lvx.setLineDash([]);
 if (L.i === undefined) {
+lvx.save();
 lvx.setTransform(1, 0, 0, 1, 0, 0);
 lvx.clearRect(0, 0, liveCv.width, liveCv.height);
-if (liveD)
-lvx.setTransform(liveD.k, 0, 0, liveD.k, liveD.tx, liveD.ty);
-else
-lvx.setTransform(Q, 0, 0, Q, 0, 0);
-paintStroke(lvx, st);
-L.i = n - 1;
-return true;
+lvx.restore();
+lvx.lineWidth = wv ? bw * wv[0] : bw;
+lvx.beginPath();
+lvx.moveTo(pts[0].x, pts[0].y);
+lvx.lineTo((pts[0].x + pts[1].x) / 2, (pts[0].y + pts[1].y) / 2);
+lvx.stroke();
+L.i = 1;
 }
 if (n - 2 >= L.i) {
-if (liveD)
-lvx.setTransform(liveD.k, 0, 0, liveD.k, liveD.tx, liveD.ty);
-else
-lvx.setTransform(Q, 0, 0, Q, 0, 0);
-const a = pts[L.i - 1], b = pts[L.i], wv = (st.wv && st.wv.length === n) ? st.wv : null;
+const a = pts[L.i - 1], b = pts[L.i];
 let P = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 for (let i = L.i; i <= n - 2; i++) {
 const c0 = pts[i], d = pts[i + 1], E = { x: (c0.x + d.x) / 2, y: (c0.y + d.y) / 2 };
-lvx.lineWidth = wv ? st.size * wv[i] : st.size;
+lvx.lineWidth = wv ? bw * wv[i] : bw;
 lvx.beginPath();
 lvx.moveTo(P.x, P.y);
 lvx.quadraticCurveTo(c0.x, c0.y, E.x, E.y);
@@ -1335,10 +1675,17 @@ function liveFrame() {
 liveRaf = 0;
 if (!live)
 return;
+const isPencil = (live.st.penType || 'pen') === 'pencil' && live.st.tool === 'pen';
 if (live.st.tool !== 'shape') {
 stepLive(live, performance.now());
 if (dist(live.f, live.raw) > .2 / (canvas._scale || 1))
 liveKick();
+}
+if (isPencil) {
+// the pencil stamps its own grain, incrementally: no clear, no full repaint of the stroke
+stampPencil(live, live.stampFrom || 0);
+live.stampFrom = live.st.pts.length;
+return;
 }
 if (liveInc(live))
 return;
@@ -1472,7 +1819,6 @@ return;
 ctx.setTransform(Q, 0, 0, Q, 0, 0);
 paintStroke(ctx, st);
 byId('selBar').style.display = 'none';
-renderTexts();
 const d = detailWin();
 if (!d) {
 detCv.style.display = 'none';
@@ -1516,9 +1862,11 @@ applySnap(st, snapPreview.res);
 snapped = true;
 }
 snapPreview = null;
+simplifyStroke(st);   // RDP: throw away the points the eye cannot see
+for (const q of st.pts) { q.x = Math.round(q.x * 100) / 100; q.y = Math.round(q.y * 100) / 100; }
 st.baked = true;
 p.strokes.push(st);
-undoStack.push({ type: 'add', page: L.page, stroke: st });
+pushUndo({ type: 'add', page: L.page, stroke: st });
 redoStack = [];
 if (L.page === page)
 paintDone(st);
@@ -1779,7 +2127,7 @@ return;
 if (resizing) {
 const r = resizing;
 resizing = null;
-undoStack.push({ type: 'move', page, items: [{ s: r.img, before: r.snap, after: r.img.pts.map(q => ({ ...q })) }] });
+pushUndo({ type: 'move', page, items: [{ s: r.img, before: r.snap, after: r.img.pts.map(q => ({ ...q })) }] });
 redoStack = [];
 touch();
 return;
@@ -1789,7 +2137,7 @@ const m = moving;
 moving = null;
 const items = selected.map((s, i) => ({ s, before: m.snap[i], after: s.pts.map(q => ({ ...q })) }));
 if (items.some(it => it.after[0].x !== it.before[0].x || it.after[0].y !== it.before[0].y)) {
-undoStack.push({ type: 'move', page, items });
+pushUndo({ type: 'move', page, items });
 redoStack = [];
 }
 touch();
@@ -1804,7 +2152,7 @@ renderPage();
 if (tool === 'eraser' && eraseSnap && cur) {
 const p = cur.pages[page];
 if (p.strokes.length !== eraseSnap.length || p.strokes.some((s, i) => s !== eraseSnap[i])) {
-undoStack.push({ type: 'snap', page, before: eraseSnap, after: p.strokes.slice() });
+pushUndo({ type: 'snap', page, before: eraseSnap, after: p.strokes.slice() });
 redoStack = [];
 touch();
 }
@@ -1895,7 +2243,13 @@ const el = document.querySelector(`.tbox[data-id="${t.id}"]`);
 if (el)
 el.focus();
 }
+const UNDO_MAX = 50
+function pushUndo(a) {
+undoStack.push(a)
+if (undoStack.length > UNDO_MAX) undoStack.shift()
+}
 function undo() {
+if (window.NotarkText) NotarkText.flush()
 const a = undoStack.pop();
 if (!a || !cur)
 return;
@@ -1918,6 +2272,14 @@ if (a.added)
 p.strokes = p.strokes.filter(s => !a.added.includes(s));
 p.strokes.push(...a.strokes);
 redoStack.push(a);
+}
+if (a.type === 'text') {
+p.texts = a.before.map(t => ({ ...t }))
+selText = null
+lastText = null
+redoStack.push(a)
+if (a.page === page) renderTexts()
+if (window.NotarkText) NotarkText.sync()
 }
 if (a.page === page)
 renderPage();
@@ -1946,6 +2308,14 @@ p.strokes = p.strokes.filter(s => !a.strokes.includes(s));
 if (a.added)
 p.strokes.push(...a.added);
 undoStack.push(a);
+}
+if (a.type === 'text') {
+p.texts = a.after.map(t => ({ ...t }))
+selText = null
+lastText = null
+undoStack.push(a)
+if (a.page === page) renderTexts()
+if (window.NotarkText) NotarkText.sync()
 }
 if (a.page === page)
 renderPage();

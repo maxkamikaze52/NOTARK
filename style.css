@@ -52,7 +52,7 @@ svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.6;stroke
 .canvas-wrap{flex:1;position:relative;overflow:auto;background:var(--canvas-bg);-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-x pan-y}
 #paper{background:var(--paper);touch-action:none;display:block;cursor:crosshair}
 .text-layer{position:absolute;inset:0;pointer-events:none}
-.text-layer .tbox{position:absolute;pointer-events:auto;min-width:40px;outline:none;font-size:20px;line-height:1.35;color:var(--ink);white-space:pre-wrap;border:1px dashed transparent;border-radius:4px;padding:2px 4px}
+.text-layer .tbox{position:absolute;box-sizing:border-box;pointer-events:auto;min-width:40px;outline:none;font-size:20px;line-height:1.35;color:var(--ink);white-space:pre-wrap;border:1px dashed transparent;border-radius:4px;padding:2px 4px}
 .text-layer .tbox:focus{border-color:var(--accent)}
 .pagebar{display:flex;align-items:center;justify-content:center;gap:14px;padding:2px 12px 8px}
 .pg{width:36px;height:32px;border:none;background:none;color:var(--ink);border-radius:8px;display:grid;place-items:center;cursor:pointer}
@@ -147,7 +147,10 @@ input.hue::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;b
 .bottom-bar.ball .bar-grip{height:100%;width:100%}
 .bottom-bar.ball .bar-grip i{width:24px;height:24px;border-radius:50%;opacity:1}
 .tbox.picked{border:1.5px solid var(--accent)!important}
-.tbox .tdel{position:absolute;top:-12px;right:-12px;width:24px;height:24px;border-radius:50%;color:#fff;font-size:16px;line-height:24px;text-align:center;cursor:pointer}
+.tbox .tdel{position:absolute;top:-34px;right:-6px;width:24px;height:24px;border-radius:50%;color:#fff;font-size:16px;line-height:24px;text-align:center;cursor:pointer}
+.tbox .th{position:absolute;width:14px;height:14px;background:var(--accent);border:2px solid #fff;border-radius:4px;z-index:5;touch-action:none;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.tbox .th::before{content:'';position:absolute;inset:-8px}
+.tbox .th-nw{left:-7px;top:-7px}.tbox .th-n{left:50%;top:-7px;margin-left:-7px}.tbox .th-ne{right:-7px;top:-7px}.tbox .th-e{right:-7px;top:50%;margin-top:-7px}.tbox .th-se{right:-7px;bottom:-7px}.tbox .th-s{left:50%;bottom:-7px;margin-left:-7px}.tbox .th-sw{left:-7px;bottom:-7px}.tbox .th-w{left:-7px;top:50%;margin-top:-7px}
 .canvas-wrap.scrollfit{overflow:auto}
 .scrollfit #paper{margin:12px auto}
 .xrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 0}
@@ -751,3 +754,297 @@ body.dark .swatches .sw{box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),0 1px 2
 .fin{padding:0 6px;height:26px;border-radius:7px;font-size:11px;border-color:var(--hair);background:color-mix(in srgb,var(--ink) 6%,transparent)}
 .fin.on{background:color-mix(in srgb,var(--accent) 22%,transparent);color:var(--ink);border-color:var(--accent)}
 @media(max-width:760px){.style-panel>.color-row{flex-wrap:wrap}.rgb-col{flex-wrap:wrap}}
+
+/* ============================================================================
+   Goodnotes-style chrome (2026-11-16)
+   Warm paper neutrals instead of blue-grey, SF type, flat rounded cards on a
+   soft "desk", circular tool buttons, floating pill toolbars.
+   Appended last so it wins on equal specificity; delete this block to revert.
+   ========================================================================== */
+:root{
+  --gn-blue:#2E6BF6; --gn-blue-ink:#fff;
+  --accent:#2E6BF6; --accent-ink:#fff;
+  --bg:#F7F5F0;            /* library background: warm paper, not blue-grey */
+  --card:#FFFFFF;
+  --ink:#14161A; --sub:#8A8C91;
+  --line:rgba(20,22,26,.07); --bd:rgba(20,22,26,.10);
+  --toolbar:#FFFFFF; --paper:#FFFFFF; --rule:#E7E3DA;
+  --panel:rgba(255,255,255,.98);
+  --canvas-bg:#EAE7E0;     /* the desk the sheet sits on */
+  --seg-bg:#ECE9E2; --seg-on:#FFFFFF;
+  --gn-r:16px;
+}
+body.dark{
+  --bg:#0E1013; --card:#171A1F; --ink:#ECEDEF; --sub:#8E9298;
+  --line:rgba(255,255,255,.07); --bd:rgba(255,255,255,.10);
+  --toolbar:#171A1F; --paper:#171A1F; --rule:#262A31;
+  --panel:rgba(23,26,31,.98); --canvas-bg:#0A0C0F;
+  --seg-bg:#1D2127; --seg-on:#2A2F37;
+  --accent:#6E96FF; --accent-ink:#0B1020;
+}
+html{background:var(--bg)}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ---------- library ---------- */
+.lib-header{padding:calc(env(safe-area-inset-top) + 22px) 24px 2px;align-items:center}
+.lib-title{font-size:34px;font-weight:700;letter-spacing:-1.1px;color:var(--ink)}
+.icon-btn{width:38px;height:38px;border-radius:50%;color:var(--accent);transition:background .12s,transform .12s}
+.icon-btn:active{background:var(--seg-bg);transform:scale(.94)}
+.lib-sub{padding:2px 24px 16px}
+.lib-sub span{font-size:13px;font-weight:500;color:var(--sub);letter-spacing:.1px}
+.seg{border-radius:11px;padding:3px;gap:2px}
+.seg button{border-radius:9px;font-size:12.5px;font-weight:600;letter-spacing:-.1px;padding:6px 13px;color:var(--sub)}
+.seg button.on{color:var(--ink);box-shadow:0 1px 3px rgba(20,22,26,.16)}
+
+.note-grid{grid-template-columns:repeat(auto-fill,minmax(164px,1fr));gap:30px 22px;padding:12px 24px calc(env(safe-area-inset-bottom) + 34px)}
+/* Goodnotes shows a flat, rounded page preview on a soft desk shadow: no folded corner */
+.note-card{padding-top:0;filter:none;transition:transform .16s ease}
+.note-card::before,.note-card::after{display:none}
+.thumb{margin:0;border-radius:11px;overflow:hidden;background:var(--card);
+  box-shadow:0 1px 1px rgba(20,22,26,.05),0 4px 12px rgba(20,22,26,.10),0 0 0 .5px rgba(20,22,26,.06)}
+.note-meta{padding:9px 3px 0}
+.note-name{font-size:14px;font-weight:600;letter-spacing:-.25px;color:var(--ink)}
+.note-date{font-size:11.5px;margin-top:3px;letter-spacing:.1px}
+@media(hover:hover){.note-card:hover{transform:translateY(-2px)}}
+.note-card:hover .thumb{box-shadow:0 2px 3px rgba(20,22,26,.06),0 12px 26px rgba(20,22,26,.16),0 0 0 .5px rgba(20,22,26,.07)}
+.note-card:active{transform:scale(.985)}
+.del,.mv{top:10px}
+.note-card .del{background:rgba(20,22,26,.55);backdrop-filter:blur(8px);width:24px;height:24px}
+
+/* ---------- editor: floating pill chrome over a warm desk ---------- */
+.ed-header{gap:2px;padding:6px 8px;background:var(--toolbar)}
+.note-title{font-size:16px;font-weight:600;letter-spacing:-.3px}
+.canvas-wrap{background:var(--canvas-bg)}
+#paper{border-radius:6px;box-shadow:0 1px 2px rgba(20,22,26,.06),0 8px 30px rgba(20,22,26,.14)}
+
+.bottom-bar{
+  background:var(--card);border:.5px solid var(--bd);border-radius:24px;
+  box-shadow:0 2px 6px rgba(20,22,26,.07),0 12px 34px rgba(20,22,26,.16);
+  margin:0 10px 10px;padding:2px 4px;
+}
+.toolbar{gap:2px;padding:7px 8px 5px}
+.tool{width:44px;height:44px;border-radius:50%;color:var(--ink);transition:background .12s,color .12s,transform .1s}
+.tool:active{transform:scale(.93)}
+.tool:not(.on):hover{background:var(--seg-bg)}
+.tool.on{background:var(--accent);color:var(--accent-ink)}
+.tool.on svg{stroke:currentColor}
+.tool.on .ic-fill{fill:currentColor}
+.tool-sep{height:26px;background:var(--line);margin:0 7px}
+.sw{width:26px;height:26px;transition:transform .12s}
+.sw:active{transform:scale(.9)}
+
+.pagebar{gap:10px;padding:4px 14px 10px}
+.pg{width:34px;height:34px;border-radius:50%;color:var(--ink);transition:background .12s}
+.pg:active{background:var(--seg-bg)}
+.pg.add{background:var(--accent);color:var(--accent-ink)}
+#pageLabel{font-size:13px;font-weight:600;letter-spacing:-.2px;color:var(--sub)}
+
+/* panels share the same rounded language as the toolbar */
+.style-panel,.pmenu,.sheet-card,.scard{border-radius:20px;border:.5px solid var(--bd);
+  box-shadow:0 4px 12px rgba(20,22,26,.08),0 18px 44px rgba(20,22,26,.20)}
+.sh,.pt,.opt,.mbtn{border-radius:12px;border:1.5px solid var(--line)}
+.sh.on,.opt.on,.pt.on,.chip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.sz{background:var(--seg-bg)}
+.sz.on{background:var(--accent)}
+.toast{border-radius:14px;box-shadow:0 8px 26px rgba(20,22,26,.24)}
+
+/* Goodnotes chrome, round 2: the tool buttons are hit by higher-specificity rules
+   (.bottom-bar .tool, .tool:not(.ins)), so override on those same selectors. */
+.bottom-bar .tool,.bottom-bar.vert .tool{
+  width:42px;height:42px;border-radius:50%;align-self:center;
+  color:var(--ink);background:none;border:none;overflow:visible;
+  transition:background .12s,color .12s,transform .1s;
+}
+.bottom-bar .tool.on{
+  background:var(--accent);color:var(--accent-ink);
+  box-shadow:0 2px 8px color-mix(in srgb,var(--accent) 38%,transparent);
+}
+.bottom-bar .tool.util.on,.bottom-bar .tool:not(.ins).on{background:var(--accent);color:var(--accent-ink)}
+.bottom-bar .tool.util.on::after,.bottom-bar .tool:not(.ins).on::after{display:none}
+.bottom-bar .tool:active{transform:scale(.92)}
+@media(hover:hover){.bottom-bar .tool:not(.on):hover{background:var(--seg-bg)}}
+.bottom-bar .tool svg{width:23px;height:23px}
+
+/* Notark is light-only: any dark tokens that still get applied are neutralised. */
+html.dark,body.dark{
+  color-scheme:light;
+  --bg:#F7F5F0;--card:#FFFFFF;--ink:#14161A;--sub:#8A8C91;
+  --line:rgba(20,22,26,.07);--bd:rgba(20,22,26,.10);
+  --toolbar:#FFFFFF;--paper:#FFFFFF;--rule:#E7E3DA;
+  --panel:rgba(255,255,255,.98);--canvas-bg:#EAE7E0;
+  --seg-bg:#ECE9E2;--seg-on:#FFFFFF;
+  --accent:#2E6BF6;--accent-ink:#fff;
+}
+
+/* ============================================================================
+   GOODNOTES COPY — round 3, from MEASURED pixels (not guesswork)
+   ----------------------------------------------------------------------------
+   Measured with Vision OCR + colour sampling on the official Goodnotes
+   marketing/UI images (goodnotes.com learning-center toolbar shot 2240x1260,
+   notebook hero 1200x720):
+     background        #F9F9F9   (neutral near-white — NOT the warm beige I had)
+     UI accent blue    #3A69A9   (muted slate — NOT #2E6BF6 vivid blue)
+     second blue       #3B69A3
+     panel white       #FFFFFF / #FEFEFE
+     secondary text    #BDBBBF
+     ink               #111213
+   Layout facts from the OCR bounding boxes:
+     · document screen has a LEFT rail at x≈0.03–0.30 containing, top to bottom:
+       "Search" (y .753), the notebook name (y .682), "Notes" (.619),
+       "Pages" (.547), then one row per page "Page 23" + its first line of text
+     · the top bar carries the notebook title (y .669) and a zoom % (y .690)
+     · the tool bar is a FULL-WIDTH band at the bottom, not a floating pill
+   ========================================================================== */
+:root{
+  --gn-accent:#3A69A9;
+  --gn-accent-soft:rgba(58,105,169,.12);
+  --gn-accent-ink:#FFFFFF;
+  --gn-bg:#F9F9F9;
+  --gn-card:#FFFFFF;
+  --gn-ink:#111213;
+  --gn-sub:#8E8E93;
+  --gn-hair:rgba(60,60,67,.14);
+  --gn-rail:#F2F2F7;
+  --accent:#3A69A9; --accent-ink:#FFFFFF;
+  --bg:#F9F9F9; --card:#FFFFFF; --ink:#111213; --sub:#8E8E93;
+  --line:rgba(60,60,67,.12); --bd:rgba(60,60,67,.16);
+  --toolbar:#FFFFFF; --paper:#FFFFFF; --rule:#EDEDED;
+  --panel:#FFFFFF; --canvas-bg:#EFEFF1;
+  --seg-bg:#F2F2F7; --seg-on:#FFFFFF;
+}
+html,body,html.dark,body.dark{background:var(--gn-bg)!important;color:var(--gn-ink)}
+
+/* ---------- library: neutral, tight, cover with a coloured spine ---------- */
+.lib-header{padding:calc(env(safe-area-inset-top) + 16px) 20px 4px}
+.lib-title{font-size:28px;font-weight:700;letter-spacing:-.6px;color:var(--gn-ink)}
+.icon-btn{color:var(--gn-accent);border-radius:8px}
+.lib-sub{padding:0 20px 14px}
+.seg{background:#EDEDF0;border-radius:9px;padding:2px}
+.seg button{border-radius:7px;color:var(--gn-sub);font-size:13px;font-weight:500;padding:5px 12px}
+.seg button.on{background:#FFF;color:var(--gn-ink);box-shadow:0 1px 2px rgba(0,0,0,.10)}
+.note-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:26px 20px;padding:10px 20px calc(env(safe-area-inset-bottom) + 28px)}
+.note-card{padding-top:0;filter:none}
+.note-card::before,.note-card::after{display:none}
+/* Goodnotes covers: white page, thin rounded corners, a spine of colour on the
+   left edge, name + date underneath in small type. */
+.thumb{margin:0;border-radius:4px 7px 7px 4px;overflow:hidden;background:#fff;
+  box-shadow:0 0 0 .5px rgba(60,60,67,.16),0 2px 6px rgba(0,0,0,.10);
+  position:relative}
+.thumb::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;
+  background:var(--gn-accent);opacity:.85;z-index:2}
+.note-meta{padding:8px 2px 0}
+.note-name{font-size:13px;font-weight:600;letter-spacing:-.1px;color:var(--gn-ink)}
+.note-date{font-size:11px;color:var(--gn-sub);margin-top:1px}
+@media(hover:hover){.note-card:hover{transform:none}.note-card:hover .thumb{box-shadow:0 0 0 .5px rgba(60,60,67,.2),0 6px 16px rgba(0,0,0,.16)}}
+.note-card:active .thumb{transform:scale(.98)}
+.del,.mv{top:8px}
+.note-card .del{background:rgba(17,18,19,.5);backdrop-filter:blur(6px);width:22px;height:22px}
+
+/* ---------- editor: white chrome, full-width bottom tool band ---------- */
+.ed-header{background:#FFF;border-bottom:.5px solid var(--gn-hair);padding:4px 6px}
+.note-title{font-size:16px;font-weight:600;color:var(--gn-ink)}
+.canvas-wrap{background:var(--canvas-bg)!important}
+#paper{border-radius:2px;box-shadow:0 1px 3px rgba(0,0,0,.10),0 6px 20px rgba(0,0,0,.08)}
+
+/* full-width band, not a pill: this is the measured layout */
+.bottom-bar{
+  margin:0!important;border-radius:0!important;border:0!important;
+  border-top:.5px solid var(--gn-hair)!important;
+  background:#FFF!important;box-shadow:none!important;padding:0!important;
+}
+.toolbar{gap:0;padding:6px 6px 4px;justify-content:space-between}
+.bottom-bar .tool,.bottom-bar.vert .tool{
+  width:auto;min-width:40px;height:44px;border-radius:8px;
+  background:none;border:0;color:var(--gn-ink);overflow:visible;
+  flex:1 1 0;transition:background .1s,color .1s;
+}
+.bottom-bar .tool.on,.bottom-bar .tool.util.on,.bottom-bar .tool:not(.ins).on{
+  background:var(--gn-accent-soft);color:var(--gn-accent);
+  box-shadow:none;
+}
+.bottom-bar .tool.on::after{display:none}
+.bottom-bar .tool svg{width:24px;height:24px;stroke-width:1.5}
+@media(hover:hover){.bottom-bar .tool:not(.on):hover{background:#F4F4F6}}
+.tool-sep{height:24px;background:var(--gn-hair);margin:0 4px}
+
+.pagebar{background:#FFF;border-top:.5px solid var(--gn-hair);gap:14px;padding:4px 12px 6px}
+.pg{width:32px;height:30px;border-radius:7px;color:var(--gn-ink);background:none}
+.pg.add{background:none;color:var(--gn-accent)}
+.pg:active{background:#F2F2F7}
+#pageLabel{font-size:13px;font-weight:500;color:var(--gn-sub)}
+
+/* panels: white sheets, thin hairlines, small radius */
+.style-panel,.pmenu,.sheet-card,.scard{border-radius:13px!important;border:.5px solid var(--gn-hair)!important;
+  background:#FFF!important;box-shadow:0 8px 30px rgba(0,0,0,.16)!important}
+.sh,.pt,.opt,.mbtn{border-radius:8px;border:1px solid var(--gn-hair)}
+.sh.on,.opt.on,.pt.on,.chip.on{background:var(--gn-accent);color:#fff;border-color:var(--gn-accent)}
+.sz{background:#F2F2F7}
+.sz.on{background:var(--gn-accent)}
+.sw{width:24px;height:24px}
+
+/* ============================================================================
+   GOODNOTES EDITOR — copy of the measured layout from Max's own screenshot
+   ----------------------------------------------------------------------------
+   Measured on /Users/maxaldavert/.fathom/attachments/image-24.png (3264x736):
+     · page background        #EFEFF1
+     · sheet                  #FFFFFF
+     · a BLUE-BANDED page at the top of the sheet (#E8EDF7) — the note header row
+     · the tool bar is at the TOP, full width, white, under the title row
+     · title left of centre: "Untitled"
+     · right of the tool cluster: "< 1/1 >  +" then zoom "88 - +"
+     · light 1px hairlines, 0 radius on the bar, 8px on the buttons
+   ========================================================================== */
+:root{
+  --gn-page-bg:#EFEFF1;
+  --gn-band:#E8EDF7;
+  --gn-hairline:#DBDBDE;
+}
+.canvas-wrap{background:var(--gn-page-bg)!important}
+
+/* the bar sits under the title row, spanning the full width */
+.toolbar-bar{
+  display:flex;align-items:center;gap:0;flex-wrap:nowrap;
+  background:#FFF;border-bottom:1px solid var(--gn-hairline);
+  padding:0 6px;min-height:46px;
+  overflow-x:auto;scrollbar-width:none;
+}
+.toolbar-bar::-webkit-scrollbar{display:none}
+.toolbar-bar .toolbar{
+  display:flex;align-items:center;gap:2px;flex:1 1 auto;
+  padding:0;overflow:visible;background:none;
+}
+.toolbar-bar .tool{
+  width:38px;height:38px;min-width:38px;border-radius:8px;flex:0 0 auto;
+  color:#1C1C1E;background:none;border:0;
+}
+.toolbar-bar .tool.on,.toolbar-bar .tool.util.on,.toolbar-bar .tool:not(.ins).on{
+  background:rgba(58,105,169,.12);color:#3A69A9;box-shadow:none;
+}
+.toolbar-bar .tool.on::after{display:none}
+.toolbar-bar .tool svg{width:21px;height:21px;stroke-width:1.6}
+@media(hover:hover){.toolbar-bar .tool:not(.on):hover{background:#F4F4F6}}
+.toolbar-bar .tool-sep{height:22px;background:var(--gn-hairline);margin:0 3px;flex:0 0 auto}
+.toolbar-bar .sw{width:22px;height:22px;flex:0 0 auto}
+
+/* page stepper + zoom, right-hand cluster */
+.toolbar-bar .pagebar{
+  display:flex;align-items:center;gap:2px;flex:0 0 auto;
+  border-top:0;background:none;padding:0 2px 0 8px;margin:0;
+  border-left:1px solid var(--gn-hairline);
+}
+.toolbar-bar .pagebar .pg{width:30px;height:30px;border-radius:7px;background:none;color:#1C1C1E}
+.toolbar-bar .pagebar .pg:active{background:#F2F2F7}
+.toolbar-bar #pageLabel{font-size:13px;font-weight:500;color:#3A69A9;min-width:38px;text-align:center}
+
+/* title row: back chevron, centred-ish title, right actions */
+.ed-header{background:#FFF;border-bottom:1px solid var(--gn-hairline);min-height:50px}
+.ed-header .note-title{font-size:17px;font-weight:600;letter-spacing:-.2px}
+.ed-header .icon-btn{color:#3A69A9;width:34px;height:34px;border-radius:7px}
+.ed-header .icon-btn:active{background:#F2F2F7}
+
+/* the sheet: white on the grey page, nearly square corners, hairline edge */
+#paper{border-radius:2px!important;
+  box-shadow:0 0 0 1px rgba(0,0,0,.05),0 1px 3px rgba(0,0,0,.07),0 6px 18px rgba(0,0,0,.06)!important}

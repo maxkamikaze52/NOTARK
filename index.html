@@ -4,14 +4,22 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="color-scheme" content="light dark">
+<meta name="color-scheme" content="light">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Notark">
-<meta name="theme-color" content="#f2f4f7">
+<meta name="theme-color" content="#F7F5F0">
 <title>Notark</title>
 <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
 <link rel="apple-touch-icon" sizes="128x128" href="apple-touch-icon.png">
 <link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="handwriting.css">
+  <script>
+  /* Notark is light-only (2026-11-16). Runs before any stylesheet paints, so there is
+     no dark flash, and it neutralises the old saved theme preference. */
+  document.documentElement.classList.remove('dark');
+  document.documentElement.style.colorScheme = 'light';
+  try { localStorage.setItem('notark.theme', 'light'); } catch (e) {}
+  </script>
 </head>
 <body>
 
@@ -64,9 +72,6 @@
       <div class="lib-title">Your notes</div>
     </div>
     <div class="lib-actions">
-      <button class="icon-btn" id="themeBtn" title="Toggle theme">
-        <svg viewBox="0 0 24 24"><path d="M20 14.300A8 8 0 0 1 9.700 4a8 8 0 1 0 10.300 10.300z"/></svg>
-      </button>
       <button class="icon-btn" id="openBtn" title="Open file">
         <svg viewBox="0 0 24 24"><path d="M3.500 7.500A1.500 1.500 0 0 1 5 6h4l2 2h8a1.500 1.500 0 0 1 1.500 1.500V17a1.500 1.500 0 0 1-1.500 1.500H5A1.500 1.500 0 0 1 3.500 17z"/></svg>
       </button>
@@ -122,61 +127,9 @@
       </button>
   </header>
 
-  <div class="canvas-wrap" id="canvasWrap">
-    <canvas id="rulerTop" class="ruler ruler-top"></canvas>
-    <canvas id="rulerLeft" class="ruler ruler-left"></canvas>
-    <canvas id="paper"></canvas>
-    <div id="textLayer" class="text-layer"></div>
-    <canvas id="laser" class="laser"></canvas>
-    <div id="ring" class="ring"></div>
-    <div id="selBar" class="selbar"><button id="selSave">Save to library</button><button id="selDel">Delete selection</button></div>
-  </div>
-
-  <!-- style popover: floats above the bottom toolbar -->
-  <div class="style-panel" id="stylePanel">
-    <div class="pen-types" id="penRow" style="display:none"></div>
-    <div class="pen-types" id="shapeTypes" style="display:none"></div>
-    <div class="pen-types" id="eraserTypes" style="display:none"></div>
-    <div class="pen-types" id="selectTypes" style="display:none"></div>
-    <div class="fonts" id="fontTypes" style="display:none"></div>
-    <div class="pen-types" id="snapRow" style="display:none"><button class="sh" id="snapBtn">Snap to shapes: on</button></div>
-    <div class="opacity-row" id="laserRow" style="display:none">
-      <span>Fade</span>
-      <input type="range" id="laserRange" min="1" max="8" step="0.5" value="2.5">
-      <span class="size-val" id="laserVal">2.5 s</span>
-    </div>
-    <div class="size-row" id="sizes">
-      <div class="size-prev"><i id="sizeDot"></i></div>
-      <input type="range" id="sizeRange" min="1" max="30" step="1" value="4">
-      <span class="size-val" id="sizeVal">4 px</span>
-    </div>
-    <div class="opacity-row" id="hlOpacity" style="display:none">
-      <span>Opacity</span>
-      <input type="range" id="hlRange" min="10" max="100" value="35">
-    </div>
-    <div class="swatches" id="swatches"></div>
-    <div class="color-row" id="svWrap">
-      <div class="color-preview" id="colorPreview"></div>
-      <div class="picker" id="picker">
-        <canvas id="svCanvas" width="220" height="120"></canvas>
-        <div class="sv-cursor" id="svCursor"></div>
-        <input type="range" id="hueSlider" min="0" max="360" value="0" class="hue">
-      </div>
-      <div class="rgb-col" id="rgbCol">
-        <div class="rgb-sliders">
-          <div class="rgb-row"><span class="rgb-lab">R</span><i class="rgb-chip" id="rChip"></i><input type="number" id="rNum" min="0" max="255" step="1" value="0" inputmode="numeric" aria-label="Red"><input type="text" id="rHex" class="rgb-hex" maxlength="6" inputmode="text" spellcheck="false" aria-label="Hex colour"></div>
-          <div class="rgb-row"><span class="rgb-lab">G</span><i class="rgb-chip" id="gChip"></i><input type="number" id="gNum" min="0" max="255" step="1" value="0" inputmode="numeric" aria-label="Green"></div>
-          <div class="rgb-row"><span class="rgb-lab">B</span><i class="rgb-chip" id="bChip"></i><input type="number" id="bNum" min="0" max="255" step="1" value="0" inputmode="numeric" aria-label="Blue"></div>
-        </div>
-        <div class="fin-grid" id="finGrid"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- bottom toolbar: tools + page controls, Notability-style -->
-  <div class="bottom-bar" id="bottomBar">
-    <div class="bar-grip" id="barGrip" title="Drag to move the toolbar"><i></i></div>
-    <div class="toolbar" id="toolbar">
+  <!-- Goodnotes-style tool bar: fixed at the TOP, full width, tools then page stepper -->
+  <div class="toolbar-bar">
+<div class="toolbar" id="toolbar">
       <button class="tool ins" data-tool="pen" title="Pen">
         <svg class="ti" viewBox="0 0 28 52" aria-hidden="true">
           <g stroke="#1d2433" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round">
@@ -275,7 +228,7 @@
         <svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.500a5.500 5.500 0 0 0 0 11H13"/></svg>
       </button>
     </div>
-    <div class="pagebar">
+<div class="pagebar">
       <button class="pg" id="prevPage">
         <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
       </button>
@@ -288,6 +241,59 @@
       </button>
     </div>
   </div>
+  <div class="canvas-wrap" id="canvasWrap">
+    <canvas id="rulerTop" class="ruler ruler-top"></canvas>
+    <canvas id="rulerLeft" class="ruler ruler-left"></canvas>
+    <canvas id="paper"></canvas>
+    <div id="textLayer" class="text-layer"></div>
+    <canvas id="laser" class="laser"></canvas>
+    <div id="ring" class="ring"></div>
+    <div id="selBar" class="selbar"><button id="selSave">Save to library</button><button id="selDel">Delete selection</button></div>
+  </div>
+
+  <!-- style popover: floats above the bottom toolbar -->
+  <div class="style-panel" id="stylePanel">
+    <div class="pen-types" id="penRow" style="display:none"></div>
+    <div class="pen-types" id="shapeTypes" style="display:none"></div>
+    <div class="pen-types" id="eraserTypes" style="display:none"></div>
+    <div class="pen-types" id="selectTypes" style="display:none"></div>
+    <div class="fonts" id="fontTypes" style="display:none"></div>
+    <div class="pen-types" id="snapRow" style="display:none"><button class="sh" id="snapBtn">Snap to shapes: on</button></div>
+    <div class="opacity-row" id="laserRow" style="display:none">
+      <span>Fade</span>
+      <input type="range" id="laserRange" min="1" max="8" step="0.5" value="2.5">
+      <span class="size-val" id="laserVal">2.5 s</span>
+    </div>
+    <div class="size-row" id="sizes">
+      <div class="size-prev"><i id="sizeDot"></i></div>
+      <input type="range" id="sizeRange" min="1" max="30" step="1" value="4">
+      <span class="size-val" id="sizeVal">4 px</span>
+    </div>
+    <div class="opacity-row" id="hlOpacity" style="display:none">
+      <span>Opacity</span>
+      <input type="range" id="hlRange" min="10" max="100" value="35">
+    </div>
+    <div class="swatches" id="swatches"></div>
+    <div class="color-row" id="svWrap">
+      <div class="color-preview" id="colorPreview"></div>
+      <div class="picker" id="picker">
+        <canvas id="svCanvas" width="220" height="120"></canvas>
+        <div class="sv-cursor" id="svCursor"></div>
+        <input type="range" id="hueSlider" min="0" max="360" value="0" class="hue">
+      </div>
+      <div class="rgb-col" id="rgbCol">
+        <div class="rgb-sliders">
+          <div class="rgb-row"><span class="rgb-lab">R</span><i class="rgb-chip" id="rChip"></i><input type="number" id="rNum" min="0" max="255" step="1" value="0" inputmode="numeric" aria-label="Red"><input type="text" id="rHex" class="rgb-hex" maxlength="6" inputmode="text" spellcheck="false" aria-label="Hex colour"></div>
+          <div class="rgb-row"><span class="rgb-lab">G</span><i class="rgb-chip" id="gChip"></i><input type="number" id="gNum" min="0" max="255" step="1" value="0" inputmode="numeric" aria-label="Green"></div>
+          <div class="rgb-row"><span class="rgb-lab">B</span><i class="rgb-chip" id="bChip"></i><input type="number" id="bNum" min="0" max="255" step="1" value="0" inputmode="numeric" aria-label="Blue"></div>
+        </div>
+        <div class="fin-grid" id="finGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- bottom toolbar: tools + page controls, Notability-style -->
+  
 </div>
 
 <div id="snapHint" class="snap-hint"></div>
@@ -330,7 +336,11 @@
 <input type="file" id="fileInput" accept=".notark,.json" style="display:none">
 <input type="file" id="imgInput" accept="image/*" multiple style="display:none">
 <script src="app-core.js"></script>
-<script src="app-draw.js"></script>
+<script src="core-wasm.js"></script>
+  <script>coreInit("notark-core.wasm");</script>
+  <script src="pencil-saber.js"></script>
+  <script src="ink-modes.js"></script>
+  <script src="app-draw.js"></script>
 <script src="app-tools.js?v=34"></script>
 <script src="extras.js"></script>
 <script src="ui.js?v=3"></script>
@@ -338,5 +348,8 @@
 <script src="sidebar.js"></script>
 <script src="files.js"></script>
 <script src="store.js?v=1"></script>
+<script src="handwriting.js" defer></script>
+<script src="hand-font.js" defer></script>
+<script src="shortcuts.js" defer></script>
 </body>
 </html>

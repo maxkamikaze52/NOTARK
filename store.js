@@ -16,7 +16,7 @@ const DB_NAME = 'notark-data';
 const HIST_GAP = 30 * 60 * 1000;       // at most one saved version per note per 30 min
 const HIST_KEEP = 6;                   // versions kept per note
 const KEEP_DAYS = 60;                  // trash / old versions are cleared after this
-const LS_KEYS = ['notark.tpl', 'notark.stamps', 'notark.pens', 'notark.colors', 'notark.settings'];
+const LS_KEYS = ['notark.tpl', 'notark.stamps', 'notark.pens', 'notark.colors', 'notark.settings', 'notark.myhand'];
 
 let db = null, ready = false, busy = false, again = false, lastSafe = 0, timer = 0;
 const sigs = new Map();                // note id -> signature of what is stored in the safe copy
@@ -55,9 +55,13 @@ const _lsWrite = lsWrite;
 lsWrite = function () { _lsWrite(); schedule(); };
 function schedule() { clearTimeout(timer); timer = setTimeout(snapshot, 400); }
 
-async function snapshot() {
+async function snapshot(force) {
 if (!db || !ready)
 return;
+if (force !== true && window.notarkIsDrawing && window.notarkIsDrawing()) {
+schedule();
+return;
+}
 if (busy) {
 again = true;
 return;
@@ -297,7 +301,8 @@ st.after(n);
 }
 
 /* flush as soon as the app is backgrounded */
-const flush = () => { clearTimeout(timer); snapshot(); snapshotKV(); };
+const flush = () => { clearTimeout(timer); snapshot(true); snapshotKV(); };
+window.notarkKVFlush = snapshotKV;   // lets handwriting.js mirror glyphs to the safe copy right after each save
 addEventListener('pagehide', flush);
 document.addEventListener('visibilitychange', () => { if (document.hidden)
 flush(); });

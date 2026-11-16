@@ -38,9 +38,14 @@ function notesApiWrite(){
     .catch(e => { console.warn('Notark: could not write notes.json', e); notesFileOK = false; setDiskStatus('Could not write notes.json — saving in this browser instead'); })
     .finally(() => { notesFileBusy = false; if(notesFileAgain){ notesFileAgain = false; notesApiWrite(); } });
 }
+function idleTimeout(fn, ms, set){
+  // runs fn after ms, but waits (re-checks every 500 ms) while the user is drawing
+  const tick = () => { if(window.notarkIsDrawing && window.notarkIsDrawing()) set(setTimeout(tick, 500)); else fn(); };
+  return setTimeout(tick, ms);
+}
 function notesFileSave(){
   if(!notesFileOK) return;
-  clearTimeout(notesFileTimer); notesFileTimer = setTimeout(notesApiWrite, 600);
+  clearTimeout(notesFileTimer); notesFileTimer = idleTimeout(notesApiWrite, 2000, id => { notesFileTimer = id; });
 }
 
 const SIZES = [2,4,7,12];
@@ -151,8 +156,9 @@ const FONTS = [
   {id:'hand',   label:'Handwriting', css:'Noteworthy,"Bradley Hand","Segoe Print","Comic Sans MS",cursive'},
   {id:'marker', label:'Marker',      css:'"Marker Felt","Chalkboard SE","Comic Sans MS",fantasy'},
   {id:'round',  label:'Rounded',     css:'"SF Pro Rounded","Arial Rounded MT Bold","Varela Round",sans-serif'},
+  {id:'mine',   label:'My Hand',     css:'"Notark Hand","Bradley Hand",Noteworthy,cursive'},
 ];
-const fontCss = id => (FONTS.find(f=>f.id===id)||FONTS[0]).css;
+const fontCss = id => { if(id==='mine' && window.NotarkFont) NotarkFont.use(); return (FONTS.find(f=>f.id===id)||FONTS[0]).css; };
 const imgCache = new Map();
 function getImg(src){
   let im = imgCache.get(src);
@@ -169,9 +175,11 @@ const flushNow = ()=>{ clearTimeout(lsT); lsWrite(); clearTimeout(notesFileTimer
 addEventListener('pagehide', flushNow);
 addEventListener('visibilitychange', ()=>{ if(document.hidden) flushNow(); });
 function save(){
-  clearTimeout(lsT); lsT = setTimeout(lsWrite, 1200);
+  /* These are full-document writes (the whole notes array), so they are deliberately lazy:
+     writing on every stroke is what made a page of handwriting feel sticky. */
+  clearTimeout(lsT); lsT = idleTimeout(lsWrite, 2500, id => { lsT = id; });
   notesFileSave();
-  clearTimeout(diskTimer); diskTimer = setTimeout(flushDisk, 1200);
+  clearTimeout(diskTimer); diskTimer = idleTimeout(flushDisk, 2500, id => { diskTimer = id; });
 }
 /* ---- device folder (File System Access API): notes autosave as .notark files, no server ---- */
 const idb = (m, ...a) => new Promise((res, rej) => { const r = indexedDB.open('notark',1); r.onupgradeneeded = ()=>r.result.createObjectStore('h');
@@ -358,7 +366,7 @@ function selBox(){ let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; for(const s of selected) f
 function inSel(q){ const b = selBox(); return q.x>b.x0-8 && q.x<b.x1+8 && q.y>b.y0-8 && q.y<b.y1+8; }
 function delSel(){
   const p = cur.pages[page], before = p.strokes.slice(); p.strokes = p.strokes.filter(s=>!selected.includes(s));
-  undoStack.push({type:'snap', page, before, after:p.strokes.slice()}); redoStack = []; selected = []; renderPage(); touch();
+  pushUndo({type:'snap', page, before, after:p.strokes.slice()}); redoStack = []; selected = []; renderPage(); touch();
 }
 
 function fmtDate(ts){
@@ -403,16 +411,18 @@ function openNote(id){
   if(libView === 'all' && (cur.folder || '') !== (folder || '')){ folder = cur.folder || null; renderFolders(); }
   page = 0;
   undoStack = []; redoStack = [];   // never carry undo history across notes
+  if (typeof clearStrokeCache === 'function') clearStrokeCache();
   selected = []; lassoPath = null; drawing = false;
   $('#noteTitle').value = cur.title;
   $('#library').classList.remove('active');
   $('#editor').classList.add('active');
   clearLaser(); resetLive();
-  layoutBar(); updatePageLabel();
+  updatePageLabel();
 }
 function closeEditor(){
   if(cur && localStorage.getItem('notark.askSave') === '1') shareNotes([cur], cur.title || 'Note');   // optional "Save to Files" prompt
   opfsSaveAll();                       // silent safety-net snapshot before leaving the note
+  if (typeof clearStrokeCache === 'function') clearStrokeCache();
   $('#editor').classList.remove('active');
   $('#library').classList.add('active');
   cur = null; detCv.style.display = 'none'; clearLaser(); resetLive(); closeLib(); $('#stylePanel').classList.remove('show'); renderLibrary();
