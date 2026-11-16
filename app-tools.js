@@ -59,7 +59,7 @@ const MIN_PX=8;
 let paperMm=210;try{const v=parseFloat(localStorage.getItem(PKEY));if(v>=50&&v<=2000)paperMm=v}catch(e){}
 const S={cx:0,cy:0,len:0,A:0,on:false,init:false};
 try{const j=JSON.parse(localStorage.getItem(KEY));if(j&&[j.cx,j.cy,j.len,j.A].every(Number.isFinite)){Object.assign(S,{cx:j.cx,cy:j.cy,len:j.len,A:n360(j.A),init:true})}}catch(e){}
-const saveS=()=>{try{localStorage.setItem(KEY,JSON.stringify({cx:S.cx,cy:S.cy,len:S.len,A:S.A}))}catch(e){}};
+const savePickerS=()=>{try{localStorage.setItem(KEY,JSON.stringify({cx:S.cx,cy:S.cy,len:S.len,A:S.A}))}catch(e){}};
 const curPage=()=>typeof cur!=="undefined"&&cur&&cur.pages?cur.pages[page]:null;
 const metrics=()=>{
   const pg=curPage();if(!pg)return null;
@@ -246,11 +246,11 @@ el.addEventListener("pointermove",e=>{
   }
   S.cx=cl(S.cx,0,m.pg.w);S.cy=cl(S.cy,0,m.pg.h);
 });
-const upPtr=e=>{if(!ptrs.delete(e.pointerId))return;if(ptrs.size)begin();else{g0=null;saveS()}};
+const upPtr=e=>{if(!ptrs.delete(e.pointerId))return;if(ptrs.size)begin();else{g0=null;savePickerS()}};
 el.addEventListener("pointerup",upPtr);el.addEventListener("pointercancel",upPtr);
 
 /* ---- rotate button: tap to turn the ruler to the next 45° ---- */
-rotBtn.addEventListener("click",()=>{S.A=n360(Math.round(S.A/45)*45+45)%360;saveS();kick()});
+rotBtn.addEventListener("click",()=>{S.A=n360(Math.round(S.A/45)*45+45)%360;savePickerS();kick()});
 /* ---- rotate (knob, left end, pivots on the centre) ---- */
 let rotId=null;
 rot.addEventListener("pointerdown",e=>{e.preventDefault();e.stopPropagation();rot.setPointerCapture(e.pointerId);rotId=e.pointerId});
@@ -261,7 +261,7 @@ rot.addEventListener("pointermove",e=>{
   for(const t of[0,45,90,135,180,225,270,315,360])if(Math.abs(a-t)<1.5){a=t%360;break}
   S.A=a;
 });
-const rotEnd=e=>{if(rotId===e.pointerId){rotId=null;saveS()}};
+const rotEnd=e=>{if(rotId===e.pointerId){rotId=null;savePickerS()}};
 rot.addEventListener("pointerup",rotEnd);rot.addEventListener("pointercancel",rotEnd);
 
 /* ---- resize (grip, right end; left end stays put) ---- */
@@ -278,7 +278,7 @@ grip.addEventListener("pointermove",e=>{
   S.len=cl(Math.round(L*m.mmU),MIN_MM,MAX_MM)/m.mmU;
   S.cx=rs.lx+rs.ux*S.len/2;S.cy=rs.ly+rs.uy*S.len/2;
 });
-const rsEnd=e=>{if(rs&&rs.id===e.pointerId){rs=null;saveS()}};
+const rsEnd=e=>{if(rs&&rs.id===e.pointerId){rs=null;savePickerS()}};
 grip.addEventListener("pointerup",rsEnd);grip.addEventListener("pointercancel",rsEnd);
 
 
@@ -322,7 +322,7 @@ function snapToEdge(){
 
 /* ---- live edge: a stroke that starts beside the ruler follows its edge like a real straightedge ---- */
 let rule=null,synth=false;
-const DRAW_TOOLS=["pen","pencil","marker","highlighter"];
+const PICKER_DRAW_TOOLS=["pen","pencil","marker","highlighter"];
 function edgeGeom(e){
   const m=metrics();if(!m)return null;
   const p=toP(m,e.clientX,e.clientY),r=S.A*Math.PI/180,ux=Math.cos(r),uy=-Math.sin(r),vx=-uy,vy=ux;
@@ -343,7 +343,7 @@ function fire(e,type){
   synth=true;try{canvas.dispatchEvent(ev)}finally{synth=false}
 }
 addEventListener("pointerdown",e=>{
-  if(synth||rule||!S.on||e.target!==canvas||!DRAW_TOOLS.includes(tool))return;
+  if(synth||rule||!S.on||e.target!==canvas||!PICKER_DRAW_TOOLS.includes(tool))return;
   if(e.pointerType==="mouse"&&e.button!==0)return;
   const G=edgeGeom(e);if(!G)return;
   const tol=26/G.m.sc,side=G.d<0?-1:1,out=side*G.d-G.hh;
@@ -354,12 +354,12 @@ addEventListener("pointerdown",e=>{
 let dId=null,dSide=1;
 addEventListener("pointerdown",e=>{
   if(synth)return;dId=null;
-  if(rule||!S.on||e.target!==canvas||!DRAW_TOOLS.includes(tool))return;
+  if(rule||!S.on||e.target!==canvas||!PICKER_DRAW_TOOLS.includes(tool))return;
   const G=edgeGeom(e);dId=e.pointerId;dSide=G&&G.d<0?-1:1;
 },true);
 addEventListener("pointermove",e=>{
   if(synth)return;
-  if(!rule&&e.pointerId===dId&&S.on&&DRAW_TOOLS.includes(tool)){
+  if(!rule&&e.pointerId===dId&&S.on&&PICKER_DRAW_TOOLS.includes(tool)){
     /* pen reaches the ruler body mid-stroke: stop at the edge and slide along it */
     const G=edgeGeom(e);
     if(G){
@@ -405,7 +405,7 @@ btn.addEventListener("click",()=>{
   if(!S.on&&!curPage())return;
   S.on=!S.on;btn.classList.toggle("on",S.on);
   const sp=document.querySelector("#stylePanel");sp&&sp.classList.remove("show");
-  if(S.on)kick();else{setVis(false);saveS()}
+  if(S.on)kick();else{setVis(false);savePickerS()}
 });
 if(ed)new MutationObserver(()=>{if(S.on)kick()}).observe(ed,{attributes:true,attributeFilter:["class"]});
 })();
